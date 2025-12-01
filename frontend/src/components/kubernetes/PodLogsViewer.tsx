@@ -5,8 +5,11 @@ import {
   XMarkIcon,
   ArrowDownTrayIcon,
   MagnifyingGlassIcon,
+  SignalIcon,
+  SignalSlashIcon,
 } from '@heroicons/react/24/outline';
 import { kubernetesApi } from '../../services/api';
+import { useWebSocketLogs } from '../../hooks/useWebSocketLogs';
 import type { Pod, PodLogs } from '../../types';
 
 interface PodLogsViewerProps {
@@ -24,33 +27,58 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showTimestamps, setShowTimestamps] = useState(false);
   const [showPrevious, setShowPrevious] = useState(false);
+  const [streamingMode, setStreamingMode] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
+  // WebSocket streaming hook
+  const {
+    logs: wsLogs,
+    connected: wsConnected,
+    error: wsError,
+    status: wsStatus,
+    clearLogs: clearWsLogs,
+  } = useWebSocketLogs({
+    namespace: pod.namespace,
+    podName: pod.name,
+    container: selectedContainer,
+    tailLines,
+    timestamps: showTimestamps,
+    enabled: streamingMode,
+  });
+
   useEffect(() => {
-    fetchLogs();
-  }, [selectedContainer, tailLines, showTimestamps, showPrevious]);
+    if (!streamingMode) {
+      fetchLogs();
+    }
+  }, [selectedContainer, tailLines, showTimestamps, showPrevious, streamingMode]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (autoRefresh) {
+    if (autoRefresh && !streamingMode) {
       interval = setInterval(fetchLogs, 5000);
     }
     return () => clearInterval(interval);
-  }, [autoRefresh, selectedContainer, tailLines]);
+  }, [autoRefresh, selectedContainer, tailLines, streamingMode]);
+
+  // Auto-scroll when new logs arrive in streaming mode
+  useEffect(() => {
+    if (streamingMode && wsLogs.length > 0) {
+      logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [wsLogs.length, streamingMode]);
 
   async function fetchLogs() {
     setLoading(true);
     setError(null);
     try {
       const response = await kubernetesApi.getPodLogs(pod.namespace, pod.name, {
-        container: selectedContainer || undefined, // Don't send empty string
+        container: selectedContainer || undefined,
         tailLines,
         timestamps: showTimestamps,
         previous: showPrevious,
       });
       setLogs(response.data);
     } catch (err: unknown) {
-      // Extract error message from axios error response
       let errorMessage = 'Failed to fetch logs';
       if (err && typeof err === 'object') {
         const axiosErr = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -72,8 +100,9 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
   }
 
   function downloadLogs() {
-    if (!logs) return;
-    const blob = new Blob([logs.logs], { type: 'text/plain' });
+    const logsContent = streamingMode ? wsLogs.join('\n') : logs?.logs || '';
+    if (!logsContent) return;
+    const blob = new Blob([logsContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -82,7 +111,14 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
     URL.revokeObjectURL(url);
   }
 
-  function getFilteredLogs() {
+  function getFilteredLogs(): string {
+    if (streamingMode) {
+      const logsText = wsLogs.join('\n');
+      if (!searchTerm) return logsText;
+      return wsLogs
+        .filter((line) => line.toLowerCase().includes(searchTerm.toLowerCase()))
+        .join('\n');
+    }
     if (!logs || !searchTerm) return logs?.logs || '';
     return logs.logs
       .split('\n')
@@ -96,7 +132,17 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
     return text.replace(regex, '<mark class="bg-yellow-300">$1</mark>');
   }
 
+  function handleStreamingModeChange(enabled: boolean) {
+    setStreamingMode(enabled);
+    if (enabled) {
+      setAutoRefresh(false);
+      clearWsLogs();
+    }
+  }
+
   const filteredLogs = getFilteredLogs();
+  const currentError = streamingMode ? wsError : error;
+  const isLoading = streamingMode ? !wsConnected && wsStatus === 'connecting' : loading && !logs;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -112,9 +158,28 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <XMarkIcon className="h-5 w-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Streaming status indicator */}
+            {streamingMode && (
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+                wsConnected
+                  ? 'bg-green-100 text-green-700'
+                  : wsStatus === 'connecting'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-red-100 text-red-700'
+              }`}>
+                {wsConnected ? (
+                  <SignalIcon className="h-4 w-4" />
+                ) : (
+                  <SignalSlashIcon className="h-4 w-4" />
+                )}
+                {wsConnected ? 'Live' : wsStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+              </div>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+              <XMarkIcon className="h-5 w-5 text-gray-500" />
+            </button>
+          </div>
         </div>
 
         {/* Controls */}
@@ -142,6 +207,7 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
               value={tailLines}
               onChange={(e) => setTailLines(Number(e.target.value))}
               className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
+              disabled={streamingMode}
             >
               <option value={50}>50</option>
               <option value={100}>100</option>
@@ -170,6 +236,7 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
               checked={showTimestamps}
               onChange={(e) => setShowTimestamps(e.target.checked)}
               className="rounded"
+              disabled={streamingMode}
             />
             Timestamps
           </label>
@@ -180,33 +247,59 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
               checked={showPrevious}
               onChange={(e) => setShowPrevious(e.target.checked)}
               className="rounded"
+              disabled={streamingMode}
             />
             Previous
           </label>
 
-          <label className="flex items-center gap-2 text-sm">
+          {/* Streaming mode toggle */}
+          <label className="flex items-center gap-2 text-sm font-medium text-primary-600">
             <input
               type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded"
+              checked={streamingMode}
+              onChange={(e) => handleStreamingModeChange(e.target.checked)}
+              className="rounded text-primary-600"
             />
-            Auto-refresh
+            Real-time
           </label>
 
+          {/* Auto-refresh (only when not streaming) */}
+          {!streamingMode && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="rounded"
+              />
+              Auto-refresh
+            </label>
+          )}
+
           {/* Actions */}
-          <button
-            onClick={fetchLogs}
-            disabled={loading}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          {!streamingMode && (
+            <button
+              onClick={fetchLogs}
+              disabled={loading}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          )}
+
+          {streamingMode && (
+            <button
+              onClick={clearWsLogs}
+              className="btn-secondary flex items-center gap-2"
+            >
+              Clear
+            </button>
+          )}
 
           <button
             onClick={downloadLogs}
-            disabled={!logs}
+            disabled={streamingMode ? wsLogs.length === 0 : !logs}
             className="btn-secondary flex items-center gap-2"
           >
             <ArrowDownTrayIcon className="h-4 w-4" />
@@ -216,13 +309,15 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
 
         {/* Logs content */}
         <div className="flex-1 overflow-auto bg-gray-900 p-4">
-          {loading && !logs ? (
+          {isLoading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-gray-400">Loading logs...</div>
+              <div className="text-gray-400">
+                {streamingMode ? 'Connecting to log stream...' : 'Loading logs...'}
+              </div>
             </div>
-          ) : error ? (
+          ) : currentError ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-red-400">{error}</div>
+              <div className="text-red-400">{currentError}</div>
             </div>
           ) : (
             <pre
@@ -235,9 +330,17 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
 
         {/* Footer */}
         <div className="flex items-center justify-between p-3 border-t border-gray-200 bg-gray-50 text-sm text-gray-500">
-          <div>
-            {logs?.truncated && (
-              <span className="text-warning-600">Logs truncated - showing last {tailLines} lines</span>
+          <div className="flex items-center gap-4">
+            {streamingMode ? (
+              <span className="text-primary-600">
+                {wsLogs.length} lines streamed
+              </span>
+            ) : (
+              logs?.truncated && (
+                <span className="text-warning-600">
+                  Logs truncated - showing last {tailLines} lines
+                </span>
+              )
             )}
           </div>
           <button onClick={scrollToBottom} className="text-primary-600 hover:underline">

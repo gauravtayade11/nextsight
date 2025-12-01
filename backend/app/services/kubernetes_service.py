@@ -1350,5 +1350,65 @@ class KubernetesService:
                 working_directory=cwd
             )
 
+    async def stream_pod_logs(
+        self,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        tail_lines: int = 100,
+        timestamps: bool = False,
+        follow: bool = True
+    ):
+        """
+        Stream logs from a pod container as an async generator.
+
+        Yields log lines one at a time for real-time streaming.
+        First yields historical logs (tail_lines), then streams new logs if follow=True.
+        """
+        import asyncio
+
+        self._initialize()
+
+        try:
+            kwargs = {
+                "name": pod_name,
+                "namespace": namespace,
+                "container": container,
+                "tail_lines": tail_lines,
+                "timestamps": timestamps,
+                "follow": follow,
+                "_preload_content": False
+            }
+
+            response = self._core_v1.read_namespaced_pod_log(**kwargs)
+
+            for line in response.stream():
+                if isinstance(line, bytes):
+                    line = line.decode('utf-8')
+                line = line.rstrip('\n')
+                if line:
+                    yield line
+                await asyncio.sleep(0.01)
+
+        except ApiException as e:
+            logger.error(f"Error streaming pod logs: {e}")
+            raise
+        except GeneratorExit:
+            logger.info(f"Log stream closed for {namespace}/{pod_name}/{container}")
+        except Exception as e:
+            logger.error(f"Unexpected error streaming logs: {e}")
+            raise
+
+    async def get_pod(self, namespace: str, pod_name: str) -> Optional[PodInfo]:
+        """Get a specific pod by name."""
+        self._initialize()
+        try:
+            pod = self._core_v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+            return self._parse_pod(pod)
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
 
 kubernetes_service = KubernetesService()

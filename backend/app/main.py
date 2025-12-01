@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
-from app.api.routes import kubernetes, jenkins, incidents, timeline, selfservice, health, gitflow
+from app.api.routes import kubernetes, jenkins, incidents, timeline, selfservice, health, gitflow, websocket
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.include_router(incidents.router, prefix=f"{settings.API_PREFIX}/incidents", 
 app.include_router(timeline.router, prefix=f"{settings.API_PREFIX}/timeline", tags=["Timeline"])
 app.include_router(selfservice.router, prefix=f"{settings.API_PREFIX}/selfservice", tags=["Self-Service"])
 app.include_router(gitflow.router, prefix=f"{settings.API_PREFIX}/gitflow", tags=["GitFlow"])
+app.include_router(websocket.router, prefix=f"{settings.API_PREFIX}/ws", tags=["WebSocket"])
 
 
 @app.get("/")

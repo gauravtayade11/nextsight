@@ -67,3 +67,6 @@ secrets.yml
 
 # Claude
 .claude/
+
+# Articles (personal content)
+articles/
