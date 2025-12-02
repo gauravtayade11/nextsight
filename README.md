@@ -60,13 +60,24 @@ NexOps is a powerful DevOps Operations Center that provides real-time visibility
 
 ### Multi-Cluster & Security
 - **Multi-Cluster Support** - Manage multiple Kubernetes clusters from one dashboard
+  - Cluster switcher for quick context switching
+  - **Cluster Management UI** - Add, remove, and configure clusters
+  - View cluster status, metrics, and health
+  - Discover clusters from kubeconfig contexts
 - **RBAC Integration** - Role-based access control for user permissions
-- **Audit Logging** - Track user actions across the platform
+  - JWT-based authentication with 4 user roles (Admin, Developer, Operator, Viewer)
+  - Protected routes and API endpoints
+  - User management (admin only)
+  - Default test users: admin/admin123, developer/developer123, operator/operator123, viewer/viewer123
 
 ### Cost Management
 - **Cost Analysis Dashboard** - Monitor and optimize cluster costs
-- **Resource Cost Breakdown** - View costs by namespace and workload
-- **Cost Forecasting** - Predict future costs based on trends
+  - Resource cost estimation per namespace and pod
+  - CPU and memory cost breakdown
+  - 30-day cost trend visualization
+  - Optimization recommendations
+  - Resource efficiency metrics
+  - Top cost consumers identification
 
 ## Quick Start
 

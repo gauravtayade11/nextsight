@@ -25,21 +25,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Events displayed with timestamps and repeat counts
   - New API endpoint: `GET /api/v1/kubernetes/pods/{namespace}/{pod}/events`
 - **Multi-Cluster Support** - Manage multiple Kubernetes clusters from a single dashboard
-  - Cluster switcher in the header
+  - Cluster switcher in the header for quick context switching
   - Cluster-specific context management
   - Unified view across clusters
+  - **Cluster Management UI** - Full CRUD operations for cluster configurations
+    - View all configured clusters with real-time status (connected/disconnected/error)
+    - Add new clusters from kubeconfig contexts
+    - Delete clusters with safety checks (admin only)
+    - Display cluster metrics (version, nodes, namespaces)
+    - List available kubeconfig contexts
+    - Admin-only cluster operations with RBAC protection
 - **RBAC Integration** - Role-based access control for user permissions
-  - User authentication and authorization
-  - Role-based views and actions
-  - Audit logging for user actions
+  - JWT-based authentication with login/logout
+  - 4 user roles: Admin, Developer, Operator, Viewer
+  - Role-based permissions mapping for all operations
+  - Protected routes and API endpoints
+  - User management UI (admin only)
+  - Password hashing with pbkdf2_sha256
+  - Default test users for each role
 - **Helm Chart Deployment UI** - Deploy and manage Helm charts visually
-  - Browse available charts
-  - Configure values before deployment
-  - Upgrade and rollback releases
+  - List all Helm releases across namespaces
+  - View release details, history, and values
+  - Install charts from repositories
+  - Upgrade releases with custom values
+  - Rollback to previous revisions
+  - Uninstall releases
+  - Repository management
+  - Chart search and version selection
 - **Cost Analysis Dashboard** - Monitor and optimize cluster costs
-  - Resource cost breakdown by namespace
-  - Cost trends and forecasting
-  - Optimization recommendations
+  - Resource cost estimation per namespace and pod
+  - Cost breakdown by CPU and memory usage
+  - 30-day cost trend visualization
+  - Cost optimization recommendations
+  - Resource efficiency metrics
+  - Top cost consumers identification
+  - Estimated monthly/annual projections
 
 ### Improved
 - **Pod Log Viewer** - Graceful handling of non-running pods
