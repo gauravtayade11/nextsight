@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2024-12-03
+
+### Added
+- **Security Posture Dashboard** - Comprehensive security monitoring and analysis
+  - **Security Score & Grade** - Overall cluster security assessment with letter grade (A-F)
+  - **Security Findings** - Real-time detection of misconfigurations and vulnerabilities
+    - Privileged containers detection
+    - Root user containers
+    - Host path mounts
+    - Missing security contexts
+    - Sensitive volume mounts
+  - **RBAC Analysis** - Role-based access control security assessment
+    - Service account risk analysis
+    - Role binding security checks
+    - Cluster-admin binding detection
+    - Wildcard permission identification
+  - **Network Policy Coverage** - Network security posture analysis
+    - Namespace protection status
+    - Pod coverage percentage
+    - Unprotected namespace identification
+  - **Image Vulnerability Scanning** - Container image security analysis
+    - CVE detection with severity levels
+    - CVSS scores and fix versions
+    - Vulnerability trends over time
+  - **AI-Powered Remediation** - Google Gemini integration for intelligent security advice
+    - Detailed risk assessments
+    - Step-by-step remediation commands
+    - YAML configuration examples
+    - Best practices and prevention tips
+    - Modern AI-themed UI with gradient styling
+
+### Improved
+- **Modal UX Enhancement** - AI responses now appear inline within detail modals
+  - Single modal experience instead of separate popup
+  - Seamless loading states with animated gradients
+  - Collapsible AI analysis section
+- **Modern AI Styling** - Beautiful gradient-based UI for AI features
+  - Violet/Cyan gradient theme
+  - Syntax-highlighted code blocks with copy functionality
+  - Responsive markdown rendering
+
 ## [1.2.0] - 2024-12-02
 
 ### Added
@@ -147,6 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 1.3.0 | 2024-12-03 | Security Posture Dashboard with AI-Powered Remediation |
 | 1.2.0 | 2024-12-02 | Dark Mode, Terminal Persistence, Multi-Cluster, RBAC, Helm UI, Cost Dashboard |
 | 1.1.0 | 2024-12-01 | WebSocket Real-Time Log Streaming |
 | 1.0.0 | 2024-12-01 | Initial Release |

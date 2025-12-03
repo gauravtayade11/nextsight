@@ -1,0 +1,33 @@
+# CODEOWNERS - Define code ownership for pull request reviews
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @gauravtayade11
+
+# Frontend code ownership
+/frontend/ @gauravtayade11
+
+# Backend code ownership
+/backend/ @gauravtayade11
+
+# Security-related code (requires security review)
+/backend/app/core/security.py @gauravtayade11
+/backend/app/api/routes/security.py @gauravtayade11
+/backend/app/services/security_service.py @gauravtayade11
+/frontend/src/components/security/ @gauravtayade11
+SECURITY.md @gauravtayade11
+
+# CI/CD and DevOps
+/.github/ @gauravtayade11
+/docker-compose*.yml @gauravtayade11
+/Dockerfile* @gauravtayade11
+
+# Documentation
+*.md @gauravtayade11
+/docs/ @gauravtayade11
+
+# Configuration files
+*.json @gauravtayade11
+*.yml @gauravtayade11
+*.yaml @gauravtayade11
+.env* @gauravtayade11

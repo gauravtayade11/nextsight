@@ -112,8 +112,60 @@ NexOps/
 └── k8s/              # Kubernetes manifests
 ```
 
+## Branch Strategy
+
+- `main` - Production-ready code
+- `develop` - Integration branch for features
+- `feature/*` - New features
+- `bugfix/*` - Bug fixes
+- `hotfix/*` - Urgent fixes for production
+- `release/*` - Release preparation
+
+## Commit Message Format
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
+
+**Example:**
+```
+feat(security): add AI-powered remediation for RBAC issues
+
+- Integrate Google Gemini for intelligent analysis
+- Add step-by-step remediation commands
+
+Closes #123
+```
+
+## Testing
+
+```bash
+# Backend tests
+cd backend && pytest --cov=app
+
+# Frontend linting
+cd frontend && npm run lint
+
+# Type checking
+cd frontend && npx tsc --noEmit
+```
+
+## Security
+
+For security vulnerabilities, please see [SECURITY.md](SECURITY.md).
+
 ## Questions?
 
-Feel free to open an issue for any questions about contributing.
+- Check the [Wiki](https://github.com/gauravtayade11/nexops/wiki)
+- Join [Discussions](https://github.com/gauravtayade11/nexops/discussions)
+- Open an issue with the `question` label
 
 Thank you for contributing!

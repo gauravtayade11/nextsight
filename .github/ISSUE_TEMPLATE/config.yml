@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/gauravtayade11/nexops/wiki
+    about: Check the documentation for answers to common questions
+  - name: Discussions
+    url: https://github.com/gauravtayade11/nexops/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: Security Vulnerabilities (Critical)
+    url: mailto:security@nexops.local
+    about: Report critical security vulnerabilities privately via email

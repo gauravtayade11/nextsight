@@ -21,6 +21,7 @@ import {
   UserCircleIcon,
   CurrencyDollarIcon,
   CloudIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -55,6 +56,7 @@ const navigation: NavItem[] = [
   { name: 'Clusters', href: '/clusters', icon: CloudIcon },
   { name: 'Helm', href: '/helm', icon: CubeIcon },
   { name: 'Cost', href: '/cost', icon: CurrencyDollarIcon },
+  { name: 'Security', href: '/security', icon: ShieldCheckIcon },
   { name: 'Incidents', href: '/incidents', icon: ExclamationTriangleIcon },
   { name: 'Timeline', href: '/timeline', icon: ClockIcon },
   { name: 'Self-Service', href: '/selfservice', icon: WrenchScrewdriverIcon },

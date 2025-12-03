@@ -4,13 +4,17 @@
 
 ### DevOps Operations Center
 
+[![CI](https://github.com/gauravtayade11/nexops/actions/workflows/ci.yml/badge.svg)](https://github.com/gauravtayade11/nexops/actions/workflows/ci.yml)
+[![Security](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml/badge.svg)](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/gauravtayade11/nexops/releases)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5.svg)](https://kubernetes.io/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/gauravtayade11/nexops/pulls)
 
 **A modern, comprehensive Kubernetes management dashboard for DevOps teams.**
 
@@ -78,6 +82,29 @@ NexOps is a powerful DevOps Operations Center that provides real-time visibility
   - Optimization recommendations
   - Resource efficiency metrics
   - Top cost consumers identification
+
+### Security Posture Dashboard
+- **Security Score & Grade** - Overall cluster security assessment (A-F grading)
+- **Security Findings** - Real-time detection of misconfigurations
+  - Privileged containers detection
+  - Root user containers
+  - Host path mounts
+  - Missing security contexts
+- **RBAC Analysis** - Role-based access control security assessment
+  - Service account risk analysis
+  - Cluster-admin binding detection
+  - Wildcard permission identification
+- **Network Policy Coverage** - Network security posture
+  - Namespace protection status
+  - Pod coverage percentage
+- **Image Vulnerability Scanning** - Container security with Trivy
+  - CVE detection with severity levels
+  - CVSS scores and fix versions
+- **AI-Powered Remediation** - Google Gemini integration
+  - Detailed risk assessments
+  - Step-by-step remediation commands
+  - YAML configuration examples
+  - Best practices and prevention tips
 
 ## Quick Start
 

@@ -21,6 +21,7 @@ import KubectlTerminal from './components/kubernetes/KubectlTerminal';
 import HelmDashboard from './components/helm/HelmDashboard';
 import CostDashboard from './components/cost/CostDashboard';
 import ClusterManagement from './components/clusters/ClusterManagement';
+import SecurityDashboard from './components/security/SecurityDashboard';
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
                         <Route path="/releases" element={<ReleaseManager />} />
                         <Route path="/helm" element={<HelmDashboard />} />
                         <Route path="/cost" element={<CostDashboard />} />
+                        <Route path="/security" element={<SecurityDashboard />} />
                       </Routes>
                     </Layout>
                   </ProtectedRoute>
