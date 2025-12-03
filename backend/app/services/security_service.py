@@ -1,38 +1,39 @@
 """Security scanning and posture management service."""
+
 import asyncio
 import json
-import subprocess
 import os
 import shutil
-from typing import List, Dict, Any, Optional, Tuple
+import subprocess
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
-from app.schemas.security import (
-    SecurityFinding,
-    SecurityFindingType,
-    SeverityLevel,
-    VulnerabilitySummary,
-    VulnerabilityDetail,
-    ImageScanResult,
-    PodSecurityCheck,
+from app.core.config import settings
+from app.schemas.security import (  # New schemas for RBAC, Network Policies, and Trends
     ComplianceCheck,
-    SecurityScore,
-    SecurityPosture,
-    SecurityDashboardResponse,
-    # New schemas for RBAC, Network Policies, and Trends
-    RBACRiskLevel,
-    ServiceAccountRisk,
-    RoleBindingRisk,
-    RBACAnalysis,
-    NetworkPolicyStatus,
+    ImageScanResult,
     NamespaceNetworkPolicy,
     NetworkPolicyCoverage,
+    NetworkPolicyStatus,
+    PodSecurityCheck,
+    RBACAnalysis,
+    RBACRiskLevel,
+    RoleBindingRisk,
+    SecurityDashboardResponse,
+    SecurityFinding,
+    SecurityFindingType,
+    SecurityPosture,
+    SecurityScore,
     SecurityTrendPoint,
     SecurityTrends,
+    ServiceAccountRisk,
+    SeverityLevel,
+    VulnerabilityDetail,
+    VulnerabilitySummary,
 )
-from app.core.config import settings
 
 # In-memory storage for security trends (in production, use a database)
 _security_trends_history: List[SecurityTrendPoint] = []
@@ -58,8 +59,8 @@ def _find_trivy_binary() -> Optional[str]:
     # Check common installation locations
     common_paths = [
         "/opt/homebrew/bin/trivy",  # Homebrew on Apple Silicon
-        "/usr/local/bin/trivy",      # Homebrew on Intel Mac / Linux
-        "/usr/bin/trivy",             # System package manager
+        "/usr/local/bin/trivy",  # Homebrew on Intel Mac / Linux
+        "/usr/bin/trivy",  # System package manager
         os.path.expanduser("~/.local/bin/trivy"),  # User local install
     ]
 
@@ -85,10 +86,8 @@ def _get_k8s_client() -> client.CoreV1Api:
         if settings.K8S_HOST_OVERRIDE:
             configuration = client.Configuration.get_default_copy()
             if configuration.host:
-                configuration.host = configuration.host.replace(
-                    '127.0.0.1', settings.K8S_HOST_OVERRIDE
-                ).replace(
-                    'localhost', settings.K8S_HOST_OVERRIDE
+                configuration.host = configuration.host.replace("127.0.0.1", settings.K8S_HOST_OVERRIDE).replace(
+                    "localhost", settings.K8S_HOST_OVERRIDE
                 )
                 client.Configuration.set_default(configuration)
 
@@ -113,7 +112,7 @@ class SecurityService:
                 self.check_pod_security(),
                 self.run_compliance_checks(),
                 self.scan_container_images(),
-                return_exceptions=True
+                return_exceptions=True,
             )
 
             # Handle any exceptions from parallel execution
@@ -127,9 +126,7 @@ class SecurityService:
 
             # Calculate security score
             security_score = self._calculate_security_score(
-                findings=findings,
-                pod_checks=pod_checks,
-                compliance=compliance
+                findings=findings, pod_checks=pod_checks, compliance=compliance
             )
 
             # Generate recommendations
@@ -144,7 +141,7 @@ class SecurityService:
                 compliance_checks=compliance,
                 image_scans=image_scans,
                 recommendations=recommendations,
-                last_updated=datetime.utcnow()
+                last_updated=datetime.utcnow(),
             )
         except Exception as e:
             print(f"Error getting security posture: {e}")
@@ -161,79 +158,88 @@ class SecurityService:
             pods = core_v1.list_pod_for_all_namespaces()
             for pod in pods.items:
                 # Check security context
-                if pod.spec.security_context is None or \
-                   (pod.spec.security_context.run_as_non_root is None or
-                    not pod.spec.security_context.run_as_non_root):
-                    findings.append(SecurityFinding(
-                        id=f"root-{pod.metadata.namespace}-{pod.metadata.name}",
-                        type=SecurityFindingType.MISCONFIGURATION,
-                        severity=SeverityLevel.HIGH,
-                        title="Pod running as root user",
-                        description=f"Pod {pod.metadata.name} is not configured to run as non-root user",
-                        resource_type="pod",
-                        resource_name=pod.metadata.name,
-                        namespace=pod.metadata.namespace,
-                        recommendation="Set securityContext.runAsNonRoot to true",
-                        detected_at=datetime.utcnow(),
-                        can_auto_remediate=False
-                    ))
+                if pod.spec.security_context is None or (
+                    pod.spec.security_context.run_as_non_root is None or not pod.spec.security_context.run_as_non_root
+                ):
+                    findings.append(
+                        SecurityFinding(
+                            id=f"root-{pod.metadata.namespace}-{pod.metadata.name}",
+                            type=SecurityFindingType.MISCONFIGURATION,
+                            severity=SeverityLevel.HIGH,
+                            title="Pod running as root user",
+                            description=f"Pod {pod.metadata.name} is not configured to run as non-root user",
+                            resource_type="pod",
+                            resource_name=pod.metadata.name,
+                            namespace=pod.metadata.namespace,
+                            recommendation="Set securityContext.runAsNonRoot to true",
+                            detected_at=datetime.utcnow(),
+                            can_auto_remediate=False,
+                        )
+                    )
 
                 # Check for privileged containers
-                for container in (pod.spec.containers or []):
+                for container in pod.spec.containers or []:
                     if container.security_context and container.security_context.privileged:
-                        findings.append(SecurityFinding(
-                            id=f"priv-{pod.metadata.namespace}-{pod.metadata.name}-{container.name}",
-                            type=SecurityFindingType.MISCONFIGURATION,
-                            severity=SeverityLevel.CRITICAL,
-                            title="Privileged container detected",
-                            description=f"Container {container.name} in pod {pod.metadata.name} is running in privileged mode",
-                            resource_type="container",
-                            resource_name=container.name,
-                            namespace=pod.metadata.namespace,
-                            recommendation="Remove privileged flag or use specific capabilities instead",
-                            detected_at=datetime.utcnow(),
-                            can_auto_remediate=False
-                        ))
+                        findings.append(
+                            SecurityFinding(
+                                id=f"priv-{pod.metadata.namespace}-{pod.metadata.name}-{container.name}",
+                                type=SecurityFindingType.MISCONFIGURATION,
+                                severity=SeverityLevel.CRITICAL,
+                                title="Privileged container detected",
+                                description=f"Container {container.name} in pod {pod.metadata.name} is running in privileged mode",
+                                resource_type="container",
+                                resource_name=container.name,
+                                namespace=pod.metadata.namespace,
+                                recommendation="Remove privileged flag or use specific capabilities instead",
+                                detected_at=datetime.utcnow(),
+                                can_auto_remediate=False,
+                            )
+                        )
 
             # Check for services exposed to internet
             services = core_v1.list_service_for_all_namespaces()
             for svc in services.items:
                 if svc.spec.type == "LoadBalancer":
-                    findings.append(SecurityFinding(
-                        id=f"lb-{svc.metadata.namespace}-{svc.metadata.name}",
-                        type=SecurityFindingType.POLICY_VIOLATION,
-                        severity=SeverityLevel.MEDIUM,
-                        title="Service exposed via LoadBalancer",
-                        description=f"Service {svc.metadata.name} is exposed to the internet via LoadBalancer",
-                        resource_type="service",
-                        resource_name=svc.metadata.name,
-                        namespace=svc.metadata.namespace,
-                        recommendation="Review if internet exposure is necessary. Consider using Ingress with authentication.",
-                        detected_at=datetime.utcnow(),
-                        can_auto_remediate=False
-                    ))
+                    findings.append(
+                        SecurityFinding(
+                            id=f"lb-{svc.metadata.namespace}-{svc.metadata.name}",
+                            type=SecurityFindingType.POLICY_VIOLATION,
+                            severity=SeverityLevel.MEDIUM,
+                            title="Service exposed via LoadBalancer",
+                            description=f"Service {svc.metadata.name} is exposed to the internet via LoadBalancer",
+                            resource_type="service",
+                            resource_name=svc.metadata.name,
+                            namespace=svc.metadata.namespace,
+                            recommendation="Review if internet exposure is necessary. Consider using Ingress with authentication.",
+                            detected_at=datetime.utcnow(),
+                            can_auto_remediate=False,
+                        )
+                    )
 
             # Check for secrets
             secrets = core_v1.list_secret_for_all_namespaces()
             for secret in secrets.items:
                 # Check for old secrets (potential secret sprawl)
                 if secret.metadata.creation_timestamp:
-                    age_days = (datetime.utcnow().replace(tzinfo=None) -
-                               secret.metadata.creation_timestamp.replace(tzinfo=None)).days
+                    age_days = (
+                        datetime.utcnow().replace(tzinfo=None) - secret.metadata.creation_timestamp.replace(tzinfo=None)
+                    ).days
                     if age_days > 90 and secret.type != "kubernetes.io/service-account-token":
-                        findings.append(SecurityFinding(
-                            id=f"secret-age-{secret.metadata.namespace}-{secret.metadata.name}",
-                            type=SecurityFindingType.SECRET,
-                            severity=SeverityLevel.LOW,
-                            title="Old secret detected",
-                            description=f"Secret {secret.metadata.name} is {age_days} days old",
-                            resource_type="secret",
-                            resource_name=secret.metadata.name,
-                            namespace=secret.metadata.namespace,
-                            recommendation="Review and rotate secrets regularly. Consider using external secret management.",
-                            detected_at=datetime.utcnow(),
-                            can_auto_remediate=False
-                        ))
+                        findings.append(
+                            SecurityFinding(
+                                id=f"secret-age-{secret.metadata.namespace}-{secret.metadata.name}",
+                                type=SecurityFindingType.SECRET,
+                                severity=SeverityLevel.LOW,
+                                title="Old secret detected",
+                                description=f"Secret {secret.metadata.name} is {age_days} days old",
+                                resource_type="secret",
+                                resource_name=secret.metadata.name,
+                                namespace=secret.metadata.namespace,
+                                recommendation="Review and rotate secrets regularly. Consider using external secret management.",
+                                detected_at=datetime.utcnow(),
+                                can_auto_remediate=False,
+                            )
+                        )
 
             # Cache findings for this cluster
             self.findings_cache[cluster_id] = findings
@@ -263,12 +269,11 @@ class SecurityService:
                 read_only_root_fs = True
 
                 # Check containers
-                for container in (pod.spec.containers or []):
+                for container in pod.spec.containers or []:
                     if container.security_context:
                         if container.security_context.privileged:
                             privileged_containers.append(container.name)
-                        if container.security_context.capabilities and \
-                           container.security_context.capabilities.add:
+                        if container.security_context.capabilities and container.security_context.capabilities.add:
                             capabilities_added.extend(container.security_context.capabilities.add)
                         if container.security_context.read_only_root_filesystem is False:
                             read_only_root_fs = False
@@ -292,18 +297,20 @@ class SecurityService:
 
                 score = max(0, score)
 
-                checks.append(PodSecurityCheck(
-                    pod_name=pod.metadata.name,
-                    namespace=pod.metadata.namespace,
-                    runs_as_root=runs_as_root,
-                    privileged_containers=privileged_containers,
-                    host_network=host_network,
-                    host_pid=host_pid,
-                    host_ipc=host_ipc,
-                    capabilities_added=capabilities_added,
-                    read_only_root_filesystem=read_only_root_fs,
-                    security_score=score
-                ))
+                checks.append(
+                    PodSecurityCheck(
+                        pod_name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        runs_as_root=runs_as_root,
+                        privileged_containers=privileged_containers,
+                        host_network=host_network,
+                        host_pid=host_pid,
+                        host_ipc=host_ipc,
+                        capabilities_added=capabilities_added,
+                        read_only_root_filesystem=read_only_root_fs,
+                        security_score=score,
+                    )
+                )
 
         except Exception as e:
             print(f"Error checking pod security: {e}")
@@ -318,43 +325,49 @@ class SecurityService:
             core_v1 = _get_k8s_client()
 
             # Check 1: Ensure that the --anonymous-auth argument is set to false
-            checks.append(ComplianceCheck(
-                check_id="CIS-4.2.1",
-                category="API Server",
-                description="Ensure anonymous authentication is disabled",
-                passed=True,  # Simplified - would need to check actual API server config
-                severity=SeverityLevel.HIGH,
-                remediation="Set --anonymous-auth=false in API server configuration",
-                affected_resources=[]
-            ))
+            checks.append(
+                ComplianceCheck(
+                    check_id="CIS-4.2.1",
+                    category="API Server",
+                    description="Ensure anonymous authentication is disabled",
+                    passed=True,  # Simplified - would need to check actual API server config
+                    severity=SeverityLevel.HIGH,
+                    remediation="Set --anonymous-auth=false in API server configuration",
+                    affected_resources=[],
+                )
+            )
 
             # Check 2: Ensure default namespace is not used
             pods_in_default = core_v1.list_namespaced_pod(namespace="default")
             default_ns_passed = len(pods_in_default.items) == 0
-            checks.append(ComplianceCheck(
-                check_id="CIS-5.7.1",
-                category="Workload Isolation",
-                description="Ensure default namespace is not used for workloads",
-                passed=default_ns_passed,
-                severity=SeverityLevel.MEDIUM,
-                remediation="Create and use specific namespaces for workloads instead of default",
-                affected_resources=[pod.metadata.name for pod in pods_in_default.items]
-            ))
+            checks.append(
+                ComplianceCheck(
+                    check_id="CIS-5.7.1",
+                    category="Workload Isolation",
+                    description="Ensure default namespace is not used for workloads",
+                    passed=default_ns_passed,
+                    severity=SeverityLevel.MEDIUM,
+                    remediation="Create and use specific namespaces for workloads instead of default",
+                    affected_resources=[pod.metadata.name for pod in pods_in_default.items],
+                )
+            )
 
             # Check 3: Ensure network policies exist
             networking_v1 = client.NetworkingV1Api()
             try:
                 policies = networking_v1.list_network_policy_for_all_namespaces()
                 network_policy_passed = len(policies.items) > 0
-                checks.append(ComplianceCheck(
-                    check_id="CIS-5.3.2",
-                    category="Network Segmentation",
-                    description="Ensure Network Policies are used to segment traffic",
-                    passed=network_policy_passed,
-                    severity=SeverityLevel.HIGH,
-                    remediation="Implement NetworkPolicy resources to control pod-to-pod communication",
-                    affected_resources=[]
-                ))
+                checks.append(
+                    ComplianceCheck(
+                        check_id="CIS-5.3.2",
+                        category="Network Segmentation",
+                        description="Ensure Network Policies are used to segment traffic",
+                        passed=network_policy_passed,
+                        severity=SeverityLevel.HIGH,
+                        remediation="Implement NetworkPolicy resources to control pod-to-pod communication",
+                        affected_resources=[],
+                    )
+                )
             except ApiException:
                 pass
 
@@ -362,19 +375,24 @@ class SecurityService:
             quotas = core_v1.list_resource_quota_for_all_namespaces()
             namespaces = core_v1.list_namespace()
             ns_with_quotas = set(q.metadata.namespace for q in quotas.items)
-            ns_without_quotas = [ns.metadata.name for ns in namespaces.items
-                                if ns.metadata.name not in ns_with_quotas and
-                                ns.metadata.name not in ['kube-system', 'kube-public', 'kube-node-lease']]
+            ns_without_quotas = [
+                ns.metadata.name
+                for ns in namespaces.items
+                if ns.metadata.name not in ns_with_quotas
+                and ns.metadata.name not in ["kube-system", "kube-public", "kube-node-lease"]
+            ]
 
-            checks.append(ComplianceCheck(
-                check_id="CIS-5.2.1",
-                category="Resource Management",
-                description="Ensure ResourceQuotas are configured for each namespace",
-                passed=len(ns_without_quotas) == 0,
-                severity=SeverityLevel.MEDIUM,
-                remediation="Create ResourceQuota objects for each application namespace",
-                affected_resources=ns_without_quotas
-            ))
+            checks.append(
+                ComplianceCheck(
+                    check_id="CIS-5.2.1",
+                    category="Resource Management",
+                    description="Ensure ResourceQuotas are configured for each namespace",
+                    passed=len(ns_without_quotas) == 0,
+                    severity=SeverityLevel.MEDIUM,
+                    remediation="Create ResourceQuota objects for each application namespace",
+                    affected_resources=ns_without_quotas,
+                )
+            )
 
         except Exception as e:
             print(f"Error running compliance checks: {e}")
@@ -407,14 +425,17 @@ class SecurityService:
             # Get unique images
             images = set()
             for pod in pods.items:
-                for container in (pod.spec.containers or []):
+                for container in pod.spec.containers or []:
                     if container.image:
                         images.add(container.image)
 
             # Clean up old failed images entries
             now = datetime.utcnow()
-            expired_failed = [img for img, time in _failed_images.items()
-                             if now - time > timedelta(minutes=FAILED_IMAGE_RETRY_MINUTES)]
+            expired_failed = [
+                img
+                for img, time in _failed_images.items()
+                if now - time > timedelta(minutes=FAILED_IMAGE_RETRY_MINUTES)
+            ]
             for img in expired_failed:
                 del _failed_images[img]
 
@@ -465,18 +486,19 @@ class SecurityService:
                 # Run Trivy scan with --skip-db-update to avoid DB lock issues
                 # Only update DB on the first scan
                 cmd = [
-                    trivy_binary, "image",
-                    "--format", "json",
+                    trivy_binary,
+                    "image",
+                    "--format",
+                    "json",
                     "--quiet",
-                    "--timeout", "3m",
+                    "--timeout",
+                    "3m",
                     "--skip-db-update",  # Avoid DB lock issues with concurrent scans
-                    image
+                    image,
                 ]
 
                 process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
                 )
 
                 stdout, stderr = await process.communicate()
@@ -485,16 +507,17 @@ class SecurityService:
 
                 if process.returncode != 0:
                     # Check if it's an image not found error
-                    if "unable to find the specified image" in stderr_text or \
-                       "MANIFEST_UNKNOWN" in stderr_text or \
-                       "No such image" in stderr_text:
+                    if (
+                        "unable to find the specified image" in stderr_text
+                        or "MANIFEST_UNKNOWN" in stderr_text
+                        or "No such image" in stderr_text
+                    ):
                         print(f"Image not found (skipping): {image}")
                         _failed_images[image] = datetime.utcnow()
                         return None
 
                     # Check for DB lock issues
-                    if "may be in use by another process" in stderr_text or \
-                       "timeout" in stderr_text.lower():
+                    if "may be in use by another process" in stderr_text or "timeout" in stderr_text.lower():
                         print(f"Trivy DB busy, will retry later: {image}")
                         return None
 
@@ -531,18 +554,30 @@ class SecurityService:
                             pkg_name=vuln.get("PkgName", "unknown"),
                             installed_version=vuln.get("InstalledVersion", "unknown"),
                             fixed_version=vuln.get("FixedVersion"),
-                            severity=SeverityLevel(severity) if severity in ["critical", "high", "medium", "low", "unknown"] else SeverityLevel.UNKNOWN,
+                            severity=(
+                                SeverityLevel(severity)
+                                if severity in ["critical", "high", "medium", "low", "unknown"]
+                                else SeverityLevel.UNKNOWN
+                            ),
                             title=vuln.get("Title"),
                             description=vuln.get("Description"),
-                            cvss_score=vuln.get("CVSS", {}).get("nvd", {}).get("V3Score") if isinstance(vuln.get("CVSS"), dict) else None,
+                            cvss_score=(
+                                vuln.get("CVSS", {}).get("nvd", {}).get("V3Score")
+                                if isinstance(vuln.get("CVSS"), dict)
+                                else None
+                            ),
                             published_date=vuln.get("PublishedDate"),
-                            references=vuln.get("References", [])[:5]  # Limit to first 5 references
+                            references=vuln.get("References", [])[:5],  # Limit to first 5 references
                         )
                         vulnerability_details.append(vuln_detail)
 
-                vuln_summary.total = (vuln_summary.critical + vuln_summary.high +
-                                     vuln_summary.medium + vuln_summary.low +
-                                     vuln_summary.unknown)
+                vuln_summary.total = (
+                    vuln_summary.critical
+                    + vuln_summary.high
+                    + vuln_summary.medium
+                    + vuln_summary.low
+                    + vuln_summary.unknown
+                )
 
                 # Extract image details
                 image_parts = image.split(":")
@@ -566,7 +601,7 @@ class SecurityService:
                     vulnerability_details=vulnerability_details,
                     scan_date=datetime.utcnow(),
                     os_family=os_family,
-                    os_name=os_name
+                    os_name=os_name,
                 )
 
             except FileNotFoundError:
@@ -576,7 +611,9 @@ class SecurityService:
                 print(f"Error scanning image with Trivy: {e}")
                 return None
 
-    def _calculate_vulnerability_summary(self, findings: List[SecurityFinding], image_scans: List[ImageScanResult] = None) -> VulnerabilitySummary:
+    def _calculate_vulnerability_summary(
+        self, findings: List[SecurityFinding], image_scans: List[ImageScanResult] = None
+    ) -> VulnerabilitySummary:
         """Calculate vulnerability summary from findings and image scans."""
         summary = VulnerabilitySummary()
 
@@ -604,16 +641,12 @@ class SecurityService:
                     summary.low += scan.vulnerabilities.low
                     summary.unknown += scan.vulnerabilities.unknown
 
-        summary.total = (summary.critical + summary.high + summary.medium +
-                        summary.low + summary.unknown)
+        summary.total = summary.critical + summary.high + summary.medium + summary.low + summary.unknown
 
         return summary
 
     def _calculate_security_score(
-        self,
-        findings: List[SecurityFinding],
-        pod_checks: List[PodSecurityCheck],
-        compliance: List[ComplianceCheck]
+        self, findings: List[SecurityFinding], pod_checks: List[PodSecurityCheck], compliance: List[ComplianceCheck]
     ) -> SecurityScore:
         """
         Calculate overall security score (0-100).
@@ -683,13 +716,11 @@ class SecurityService:
             high_issues=high_issues,
             medium_issues=medium_issues,
             low_issues=low_issues,
-            last_scan=datetime.utcnow()
+            last_scan=datetime.utcnow(),
         )
 
     def _generate_recommendations(
-        self,
-        findings: List[SecurityFinding],
-        pod_checks: List[PodSecurityCheck]
+        self, findings: List[SecurityFinding], pod_checks: List[PodSecurityCheck]
     ) -> List[str]:
         """Generate actionable security recommendations."""
         recommendations = []
@@ -701,33 +732,25 @@ class SecurityService:
 
         if root_pods > 0:
             recommendations.append(
-                f"Configure {root_pods} pod(s) to run as non-root user by setting "
-                "securityContext.runAsNonRoot: true"
+                f"Configure {root_pods} pod(s) to run as non-root user by setting " "securityContext.runAsNonRoot: true"
             )
 
         if privileged_pods > 0:
             recommendations.append(
-                f"Remove privileged mode from {privileged_pods} pod(s). "
-                "Use specific Linux capabilities instead."
+                f"Remove privileged mode from {privileged_pods} pod(s). " "Use specific Linux capabilities instead."
             )
 
         if host_network_pods > 0:
-            recommendations.append(
-                f"Disable hostNetwork on {host_network_pods} pod(s) unless absolutely necessary"
-            )
+            recommendations.append(f"Disable hostNetwork on {host_network_pods} pod(s) unless absolutely necessary")
 
         # Check for high/critical findings
         critical_findings = [f for f in findings if f.severity == SeverityLevel.CRITICAL]
         if critical_findings:
-            recommendations.append(
-                f"Address {len(critical_findings)} critical security issue(s) immediately"
-            )
+            recommendations.append(f"Address {len(critical_findings)} critical security issue(s) immediately")
 
         high_findings = [f for f in findings if f.severity == SeverityLevel.HIGH]
         if high_findings:
-            recommendations.append(
-                f"Review and fix {len(high_findings)} high-severity security issue(s)"
-            )
+            recommendations.append(f"Review and fix {len(high_findings)} high-severity security issue(s)")
 
         # General best practices
         if not recommendations:
@@ -751,14 +774,14 @@ class SecurityService:
                 if f.severity.value in ["low", "medium", "high", "critical"]
                 else 0
             ),
-            reverse=True
+            reverse=True,
         )[:10]
 
         # Calculate compliance summary
         compliance_summary = {
             "passed": sum(1 for c in posture.compliance_checks if c.passed),
             "failed": sum(1 for c in posture.compliance_checks if not c.passed),
-            "total": len(posture.compliance_checks)
+            "total": len(posture.compliance_checks),
         }
 
         # Find risky namespaces (namespaces with most security issues)
@@ -766,11 +789,7 @@ class SecurityService:
         for finding in posture.findings:
             namespace_issues[finding.namespace] = namespace_issues.get(finding.namespace, 0) + 1
 
-        risky_namespaces = sorted(
-            namespace_issues.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:5]
+        risky_namespaces = sorted(namespace_issues.items(), key=lambda x: x[1], reverse=True)[:5]
 
         return SecurityDashboardResponse(
             security_score=posture.security_score,
@@ -779,7 +798,7 @@ class SecurityService:
             compliance_summary=compliance_summary,
             risky_namespaces=[ns for ns, _ in risky_namespaces],
             total_images_scanned=len(posture.image_scans),
-            last_scan=posture.last_updated
+            last_scan=posture.last_updated,
         )
 
     # ============== RBAC Analysis ==============
@@ -858,27 +877,25 @@ class SecurityService:
 
                 # Build subjects list
                 subjects = []
-                for subj in (binding.subjects or []):
-                    subjects.append({
-                        "kind": subj.kind,
-                        "name": subj.name,
-                        "namespace": subj.namespace or ""
-                    })
+                for subj in binding.subjects or []:
+                    subjects.append({"kind": subj.kind, "name": subj.name, "namespace": subj.namespace or ""})
 
                 if issues:  # Only add risky bindings
-                    role_binding_risks.append(RoleBindingRisk(
-                        name=binding.metadata.name,
-                        namespace=None,
-                        binding_type="ClusterRoleBinding",
-                        role_name=role_ref.name,
-                        role_kind=role_ref.kind,
-                        subjects=subjects,
-                        risk_level=risk_level,
-                        issues=issues,
-                        is_cluster_admin=is_cluster_admin,
-                        grants_secrets_access=grants_secrets,
-                        grants_wildcard=grants_wildcard
-                    ))
+                    role_binding_risks.append(
+                        RoleBindingRisk(
+                            name=binding.metadata.name,
+                            namespace=None,
+                            binding_type="ClusterRoleBinding",
+                            role_name=role_ref.name,
+                            role_kind=role_ref.kind,
+                            subjects=subjects,
+                            risk_level=risk_level,
+                            issues=issues,
+                            is_cluster_admin=is_cluster_admin,
+                            grants_secrets_access=grants_secrets,
+                            grants_wildcard=grants_wildcard,
+                        )
+                    )
 
             # Analyze role bindings
             for binding in role_bindings.items:
@@ -922,27 +939,25 @@ class SecurityService:
                             issues.append("Grants access to secrets")
 
                 subjects = []
-                for subj in (binding.subjects or []):
-                    subjects.append({
-                        "kind": subj.kind,
-                        "name": subj.name,
-                        "namespace": subj.namespace or ""
-                    })
+                for subj in binding.subjects or []:
+                    subjects.append({"kind": subj.kind, "name": subj.name, "namespace": subj.namespace or ""})
 
                 if issues:
-                    role_binding_risks.append(RoleBindingRisk(
-                        name=binding.metadata.name,
-                        namespace=binding.metadata.namespace,
-                        binding_type="RoleBinding",
-                        role_name=role_ref.name,
-                        role_kind=role_ref.kind,
-                        subjects=subjects,
-                        risk_level=risk_level,
-                        issues=issues,
-                        is_cluster_admin=is_cluster_admin,
-                        grants_secrets_access=grants_secrets,
-                        grants_wildcard=grants_wildcard
-                    ))
+                    role_binding_risks.append(
+                        RoleBindingRisk(
+                            name=binding.metadata.name,
+                            namespace=binding.metadata.namespace,
+                            binding_type="RoleBinding",
+                            role_name=role_ref.name,
+                            role_kind=role_ref.kind,
+                            subjects=subjects,
+                            risk_level=risk_level,
+                            issues=issues,
+                            is_cluster_admin=is_cluster_admin,
+                            grants_secrets_access=grants_secrets,
+                            grants_wildcard=grants_wildcard,
+                        )
+                    )
 
             # Analyze service accounts
             pods = core_v1.list_pod_for_all_namespaces()
@@ -967,9 +982,11 @@ class SecurityService:
                 # Check bindings for this service account
                 for rb in role_binding_risks:
                     for subj in rb.subjects:
-                        if (subj["kind"] == "ServiceAccount" and
-                            subj["name"] == sa.metadata.name and
-                            (subj["namespace"] == sa.metadata.namespace or not subj["namespace"])):
+                        if (
+                            subj["kind"] == "ServiceAccount"
+                            and subj["name"] == sa.metadata.name
+                            and (subj["namespace"] == sa.metadata.namespace or not subj["namespace"])
+                        ):
                             bound_roles.append(rb.role_name)
                             if rb.is_cluster_admin:
                                 has_cluster_admin = True
@@ -990,28 +1007,27 @@ class SecurityService:
                                     issues.append("Can access secrets")
 
                 if issues:
-                    service_account_risks.append(ServiceAccountRisk(
-                        name=sa.metadata.name,
-                        namespace=sa.metadata.namespace,
-                        risk_level=risk_level,
-                        issues=issues,
-                        has_cluster_admin=has_cluster_admin,
-                        has_secrets_access=has_secrets_access,
-                        has_wildcard_permissions=has_wildcard,
-                        bound_roles=list(set(bound_roles)),
-                        pods_using=sa_pods.get(sa_key, [])[:10]
-                    ))
+                    service_account_risks.append(
+                        ServiceAccountRisk(
+                            name=sa.metadata.name,
+                            namespace=sa.metadata.namespace,
+                            risk_level=risk_level,
+                            issues=issues,
+                            has_cluster_admin=has_cluster_admin,
+                            has_secrets_access=has_secrets_access,
+                            has_wildcard_permissions=has_wildcard,
+                            bound_roles=list(set(bound_roles)),
+                            pods_using=sa_pods.get(sa_key, [])[:10],
+                        )
+                    )
 
             # Generate recommendations
             if cluster_admin_count > 0:
                 recommendations.append(
-                    f"Review {cluster_admin_count} cluster-admin binding(s). "
-                    "Consider using more restrictive roles."
+                    f"Review {cluster_admin_count} cluster-admin binding(s). " "Consider using more restrictive roles."
                 )
             if wildcard_count > 0:
-                recommendations.append(
-                    f"Replace {wildcard_count} wildcard permission(s) with specific resources."
-                )
+                recommendations.append(f"Replace {wildcard_count} wildcard permission(s) with specific resources.")
             if len([r for r in role_binding_risks if r.grants_secrets_access]) > 0:
                 recommendations.append(
                     "Audit service accounts with secrets access and apply least-privilege principle."
@@ -1024,17 +1040,17 @@ class SecurityService:
             recommendations.append(f"Error during RBAC analysis: {str(e)}")
 
         return RBACAnalysis(
-            total_service_accounts=len(service_accounts.items) if 'service_accounts' in dir() else 0,
+            total_service_accounts=len(service_accounts.items) if "service_accounts" in dir() else 0,
             risky_service_accounts=len(service_account_risks),
-            total_role_bindings=(len(role_bindings.items) if 'role_bindings' in dir() else 0) +
-                               (len(cluster_role_bindings.items) if 'cluster_role_bindings' in dir() else 0),
+            total_role_bindings=(len(role_bindings.items) if "role_bindings" in dir() else 0)
+            + (len(cluster_role_bindings.items) if "cluster_role_bindings" in dir() else 0),
             risky_role_bindings=len(role_binding_risks),
             cluster_admin_bindings=cluster_admin_count,
             wildcard_permissions=wildcard_count,
             service_account_risks=service_account_risks,
             role_binding_risks=role_binding_risks,
             recommendations=recommendations[:5],
-            analyzed_at=datetime.utcnow()
+            analyzed_at=datetime.utcnow(),
         )
 
     # ============== Network Policy Analysis ==============
@@ -1117,10 +1133,7 @@ class SecurityService:
                             # Policy targets specific pods
                             for pod in pods.items:
                                 pod_labels = pod.metadata.labels or {}
-                                match = all(
-                                    pod_labels.get(k) == v
-                                    for k, v in spec.pod_selector.match_labels.items()
-                                )
+                                match = all(pod_labels.get(k) == v for k, v in spec.pod_selector.match_labels.items())
                                 if match:
                                     covered_pod_set.add(pod.metadata.name)
                         else:
@@ -1143,38 +1156,34 @@ class SecurityService:
 
                     pods_covered = pods_covered_count
 
-                namespace_policies.append(NamespaceNetworkPolicy(
-                    namespace=ns_name,
-                    status=status,
-                    policy_count=len(ns_policies),
-                    policies=policy_names,
-                    pods_total=ns_pod_count,
-                    pods_covered=pods_covered,
-                    pods_uncovered=pods_uncovered,
-                    has_default_deny_ingress=has_default_deny_ingress,
-                    has_default_deny_egress=has_default_deny_egress
-                ))
+                namespace_policies.append(
+                    NamespaceNetworkPolicy(
+                        namespace=ns_name,
+                        status=status,
+                        policy_count=len(ns_policies),
+                        policies=policy_names,
+                        pods_total=ns_pod_count,
+                        pods_covered=pods_covered,
+                        pods_uncovered=pods_uncovered,
+                        has_default_deny_ingress=has_default_deny_ingress,
+                        has_default_deny_egress=has_default_deny_egress,
+                    )
+                )
 
             # Calculate coverage percentage
             coverage_pct = (covered_pods / total_pods * 100) if total_pods > 0 else 0
 
             # Generate recommendations
             if unprotected_count > 0:
-                recommendations.append(
-                    f"Add network policies to {unprotected_count} unprotected namespace(s)"
-                )
+                recommendations.append(f"Add network policies to {unprotected_count} unprotected namespace(s)")
             if not any(np.has_default_deny_ingress for np in namespace_policies):
-                recommendations.append(
-                    "Implement default-deny ingress policies for zero-trust networking"
-                )
+                recommendations.append("Implement default-deny ingress policies for zero-trust networking")
             if partial_count > 0:
                 recommendations.append(
                     f"Extend network policy coverage in {partial_count} partially protected namespace(s)"
                 )
             if coverage_pct < 80:
-                recommendations.append(
-                    f"Current coverage is {coverage_pct:.1f}%. Aim for >80% pod coverage."
-                )
+                recommendations.append(f"Current coverage is {coverage_pct:.1f}%. Aim for >80% pod coverage.")
             if not recommendations:
                 recommendations.append("Network policy coverage is excellent!")
 
@@ -1192,7 +1201,7 @@ class SecurityService:
             coverage_percentage=coverage_pct,
             namespaces=namespace_policies,
             recommendations=recommendations[:5],
-            analyzed_at=datetime.utcnow()
+            analyzed_at=datetime.utcnow(),
         )
 
     # ============== Security Trends ==============
@@ -1209,7 +1218,7 @@ class SecurityService:
             medium_count=posture.vulnerabilities.medium,
             low_count=posture.vulnerabilities.low,
             total_vulnerabilities=posture.vulnerabilities.total,
-            images_scanned=len(posture.image_scans)
+            images_scanned=len(posture.image_scans),
         )
 
         _security_trends_history.append(snapshot)
@@ -1229,10 +1238,7 @@ class SecurityService:
         cutoff = now - timedelta(days=days)
 
         # Filter to requested time range
-        filtered_data = [
-            point for point in _security_trends_history
-            if point.timestamp >= cutoff
-        ]
+        filtered_data = [point for point in _security_trends_history if point.timestamp >= cutoff]
 
         # If no historical data, create a baseline from current state
         if not filtered_data:
@@ -1284,7 +1290,7 @@ class SecurityService:
             vulnerabilities_fixed_7d=vulns_fixed_7d,
             vulnerabilities_new_7d=vulns_new_7d,
             trend_direction=trend_direction,
-            generated_at=now
+            generated_at=now,
         )
 
 

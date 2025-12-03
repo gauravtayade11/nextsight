@@ -1,5 +1,6 @@
-from fastapi import APIRouter
 from datetime import datetime, timezone
+
+from fastapi import APIRouter
 
 from app.core.config import settings
 
@@ -13,22 +14,18 @@ async def health_check():
         "status": "healthy",
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
 @router.get("/ready")
 async def readiness_check():
     """Readiness check - verifies all dependencies are available."""
-    checks = {
-        "api": True,
-        "kubernetes": False,
-        "jenkins": False,
-        "ai": False
-    }
+    checks = {"api": True, "kubernetes": False, "jenkins": False, "ai": False}
 
     try:
         from app.services.kubernetes_service import kubernetes_service
+
         kubernetes_service._initialize()
         checks["kubernetes"] = True
     except Exception:
@@ -36,6 +33,7 @@ async def readiness_check():
 
     try:
         from app.services.jenkins_service import jenkins_service
+
         jenkins_service._initialize()
         checks["jenkins"] = True
     except Exception:
@@ -46,11 +44,7 @@ async def readiness_check():
 
     all_healthy = all(checks.values())
 
-    return {
-        "ready": all_healthy,
-        "checks": checks,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+    return {"ready": all_healthy, "checks": checks, "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/live")

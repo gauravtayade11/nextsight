@@ -1,11 +1,13 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class SeverityLevel(str, Enum):
     """Vulnerability severity levels."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -15,6 +17,7 @@ class SeverityLevel(str, Enum):
 
 class SecurityFindingType(str, Enum):
     """Types of security findings."""
+
     VULNERABILITY = "vulnerability"
     MISCONFIGURATION = "misconfiguration"
     COMPLIANCE = "compliance"
@@ -24,6 +27,7 @@ class SecurityFindingType(str, Enum):
 
 class SecurityFinding(BaseModel):
     """A security finding/issue."""
+
     id: str
     type: SecurityFindingType
     severity: SeverityLevel
@@ -42,6 +46,7 @@ class SecurityFinding(BaseModel):
 
 class VulnerabilitySummary(BaseModel):
     """Summary of vulnerabilities by severity."""
+
     critical: int = 0
     high: int = 0
     medium: int = 0
@@ -52,6 +57,7 @@ class VulnerabilitySummary(BaseModel):
 
 class VulnerabilityDetail(BaseModel):
     """Detailed information about a specific vulnerability."""
+
     vulnerability_id: str  # CVE-2023-1234 or GHSA-xxx
     pkg_name: str  # Package name
     installed_version: str
@@ -66,6 +72,7 @@ class VulnerabilityDetail(BaseModel):
 
 class ImageScanResult(BaseModel):
     """Result of scanning a container image."""
+
     image: str
     tag: str
     digest: Optional[str] = None
@@ -78,6 +85,7 @@ class ImageScanResult(BaseModel):
 
 class PodSecurityCheck(BaseModel):
     """Pod security standard check result."""
+
     pod_name: str
     namespace: str
     runs_as_root: bool = False
@@ -92,6 +100,7 @@ class PodSecurityCheck(BaseModel):
 
 class ComplianceCheck(BaseModel):
     """Compliance check result."""
+
     check_id: str
     category: str
     description: str
@@ -103,6 +112,7 @@ class ComplianceCheck(BaseModel):
 
 class SecurityScore(BaseModel):
     """Overall security score."""
+
     score: int = Field(..., ge=0, le=100, description="Security score from 0-100")
     grade: str = Field(..., description="Letter grade: A, B, C, D, F")
     total_findings: int
@@ -129,6 +139,7 @@ class SecurityScore(BaseModel):
 
 class SecurityPosture(BaseModel):
     """Complete security posture for a cluster."""
+
     cluster_id: str
     security_score: SecurityScore
     vulnerabilities: VulnerabilitySummary
@@ -142,6 +153,7 @@ class SecurityPosture(BaseModel):
 
 class SecurityDashboardResponse(BaseModel):
     """Security dashboard summary."""
+
     security_score: SecurityScore
     vulnerability_summary: VulnerabilitySummary
     top_findings: List[SecurityFinding]
@@ -153,6 +165,7 @@ class SecurityDashboardResponse(BaseModel):
 
 class RemediationRequest(BaseModel):
     """Request to remediate a security finding."""
+
     finding_id: str
     auto_apply: bool = False
     approved_by: Optional[str] = None
@@ -160,8 +173,10 @@ class RemediationRequest(BaseModel):
 
 # ============== RBAC Analysis ==============
 
+
 class RBACRiskLevel(str, Enum):
     """RBAC risk levels."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -171,6 +186,7 @@ class RBACRiskLevel(str, Enum):
 
 class ServiceAccountRisk(BaseModel):
     """Service account security risk analysis."""
+
     name: str
     namespace: str
     risk_level: RBACRiskLevel
@@ -184,6 +200,7 @@ class ServiceAccountRisk(BaseModel):
 
 class RoleBindingRisk(BaseModel):
     """Role binding security risk analysis."""
+
     name: str
     namespace: Optional[str]  # None for ClusterRoleBinding
     binding_type: str  # RoleBinding or ClusterRoleBinding
@@ -199,6 +216,7 @@ class RoleBindingRisk(BaseModel):
 
 class RBACAnalysis(BaseModel):
     """Complete RBAC security analysis."""
+
     total_service_accounts: int
     risky_service_accounts: int
     total_role_bindings: int
@@ -213,8 +231,10 @@ class RBACAnalysis(BaseModel):
 
 # ============== Network Policy Coverage ==============
 
+
 class NetworkPolicyStatus(str, Enum):
     """Network policy coverage status."""
+
     PROTECTED = "protected"
     PARTIAL = "partial"
     UNPROTECTED = "unprotected"
@@ -222,6 +242,7 @@ class NetworkPolicyStatus(str, Enum):
 
 class NamespaceNetworkPolicy(BaseModel):
     """Network policy coverage for a namespace."""
+
     namespace: str
     status: NetworkPolicyStatus
     policy_count: int
@@ -235,6 +256,7 @@ class NamespaceNetworkPolicy(BaseModel):
 
 class NetworkPolicyCoverage(BaseModel):
     """Complete network policy coverage analysis."""
+
     total_namespaces: int
     protected_namespaces: int
     partial_namespaces: int
@@ -249,8 +271,10 @@ class NetworkPolicyCoverage(BaseModel):
 
 # ============== Security Trends ==============
 
+
 class SecurityTrendPoint(BaseModel):
     """A single point in security trend data."""
+
     timestamp: datetime
     security_score: int
     critical_count: int
@@ -263,6 +287,7 @@ class SecurityTrendPoint(BaseModel):
 
 class SecurityTrends(BaseModel):
     """Security trends over time."""
+
     trend_data: List[SecurityTrendPoint]
     score_change_7d: int  # Change in last 7 days
     score_change_30d: int  # Change in last 30 days
@@ -274,8 +299,10 @@ class SecurityTrends(BaseModel):
 
 # ============== Extended Dashboard Response ==============
 
+
 class SecurityDashboardExtended(BaseModel):
     """Extended security dashboard with all features."""
+
     security_score: SecurityScore
     vulnerability_summary: VulnerabilitySummary
     top_findings: List[SecurityFinding]

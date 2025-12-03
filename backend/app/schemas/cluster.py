@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class ClusterStatus(str, Enum):
@@ -13,6 +14,7 @@ class ClusterStatus(str, Enum):
 
 class ClusterConfig(BaseModel):
     """Configuration for a Kubernetes cluster."""
+
     id: str = Field(..., description="Unique cluster identifier")
     name: str = Field(..., description="Display name for the cluster")
     context: Optional[str] = Field(None, description="Kubeconfig context name")
@@ -24,6 +26,7 @@ class ClusterConfig(BaseModel):
 
 class ClusterInfo(BaseModel):
     """Basic cluster information."""
+
     id: str
     name: str
     context: Optional[str] = None
@@ -38,6 +41,7 @@ class ClusterInfo(BaseModel):
 
 class ClusterHealth(BaseModel):
     """Cluster health status."""
+
     cluster_id: str
     healthy: bool
     status: ClusterStatus
@@ -53,6 +57,7 @@ class ClusterHealth(BaseModel):
 
 class ClusterMetricsSummary(BaseModel):
     """Summary of cluster resource metrics."""
+
     cluster_id: str
     cpu_capacity: str
     cpu_usage: str
@@ -66,11 +71,13 @@ class ClusterMetricsSummary(BaseModel):
 
 class SetActiveClusterRequest(BaseModel):
     """Request to set the active cluster."""
+
     cluster_id: str = Field(..., description="ID of the cluster to set as active")
 
 
 class ClusterListResponse(BaseModel):
     """Response containing list of clusters."""
+
     clusters: List[ClusterInfo]
     active_cluster_id: Optional[str] = None
     total: int
@@ -78,6 +85,7 @@ class ClusterListResponse(BaseModel):
 
 class AddClusterRequest(BaseModel):
     """Request to add a new cluster configuration."""
+
     id: str = Field(..., min_length=1, max_length=50, description="Unique cluster ID")
     name: str = Field(..., min_length=1, max_length=100, description="Display name")
     context: Optional[str] = Field(None, description="Kubeconfig context name")
@@ -87,6 +95,7 @@ class AddClusterRequest(BaseModel):
 
 class ClusterContextInfo(BaseModel):
     """Information about a kubeconfig context."""
+
     name: str
     cluster: str
     user: str

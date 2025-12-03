@@ -1,13 +1,15 @@
 """
 Alerts API - Automatic incident detection and webhook endpoints
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
-import uuid
 
-from app.services.k8s_watcher_service import k8s_watcher_service, ALERT_RULES
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pydantic import BaseModel
+
+from app.services.k8s_watcher_service import ALERT_RULES, k8s_watcher_service
 
 router = APIRouter()
 
@@ -18,6 +20,7 @@ _incidents: dict = {}
 def get_incidents_store():
     """Get the incidents store from the incidents module"""
     from app.api.routes.incidents import _incidents as incidents_store
+
     return incidents_store
 
 
@@ -84,15 +87,17 @@ async def trigger_scan(background_tasks: BackgroundTasks):
                 "updated_at": now,
             }
 
-            incidents_store[incident_id] = type('Incident', (), incident)()
+            incidents_store[incident_id] = type("Incident", (), incident)()
             for k, v in incident.items():
                 setattr(incidents_store[incident_id], k, v)
 
-            created.append({
-                "id": incident_id,
-                "title": incident_data["title"],
-                "severity": incident_data["severity"],
-            })
+            created.append(
+                {
+                    "id": incident_id,
+                    "title": incident_data["title"],
+                    "severity": incident_data["severity"],
+                }
+            )
 
         return {
             "message": f"Scan complete. Created {len(created)} incidents.",
@@ -145,10 +150,8 @@ async def prometheus_webhook(payload: AlertmanagerWebhook):
         incident_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
 
-        title = alert.annotations.get("summary",
-                alert.labels.get("alertname", "Prometheus Alert"))
-        description = alert.annotations.get("description",
-                      f"Alert: {alert.labels.get('alertname', 'Unknown')}")
+        title = alert.annotations.get("summary", alert.labels.get("alertname", "Prometheus Alert"))
+        description = alert.annotations.get("description", f"Alert: {alert.labels.get('alertname', 'Unknown')}")
 
         incident = {
             "id": incident_id,
@@ -170,7 +173,7 @@ async def prometheus_webhook(payload: AlertmanagerWebhook):
         }
 
         # Create incident object
-        incident_obj = type('Incident', (), incident)()
+        incident_obj = type("Incident", (), incident)()
         for k, v in incident.items():
             setattr(incident_obj, k, v)
         incidents_store[incident_id] = incident_obj
@@ -222,7 +225,7 @@ async def generic_webhook(alert: GenericWebhookAlert):
         "updated_at": now,
     }
 
-    incident_obj = type('Incident', (), incident)()
+    incident_obj = type("Incident", (), incident)()
     for k, v in incident.items():
         setattr(incident_obj, k, v)
     incidents_store[incident_id] = incident_obj
@@ -277,7 +280,7 @@ async def pagerduty_webhook(payload: Dict[str, Any]):
             "updated_at": now,
         }
 
-        incident_obj = type('Incident', (), incident)()
+        incident_obj = type("Incident", (), incident)()
         for k, v in incident.items():
             setattr(incident_obj, k, v)
         incidents_store[incident_id] = incident_obj

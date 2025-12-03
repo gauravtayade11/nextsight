@@ -2,10 +2,12 @@
 Kubernetes Event Watcher Service
 Automatically monitors K8s cluster for issues and creates incidents
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
+
 import asyncio
 import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
 from kubernetes import client, watch
 from kubernetes.client.rest import ApiException
 
@@ -86,6 +88,7 @@ class K8sWatcherService:
 
         try:
             from kubernetes import config
+
             if settings.K8S_IN_CLUSTER:
                 config.load_incluster_config()
             elif settings.K8S_CONFIG_PATH:
@@ -119,10 +122,7 @@ class K8sWatcherService:
 
         # Cleanup old entries
         cutoff = now.timestamp() - self._dedup_window_seconds
-        self._recent_incidents = {
-            k: v for k, v in self._recent_incidents.items()
-            if v.timestamp() > cutoff
-        }
+        self._recent_incidents = {k: v for k, v in self._recent_incidents.items() if v.timestamp() > cutoff}
 
         return True
 
@@ -148,43 +148,51 @@ class K8sWatcherService:
                         # OOMKilled detection
                         if cs.last_state and cs.last_state.terminated:
                             if cs.last_state.terminated.reason == "OOMKilled":
-                                issues.append({
-                                    "type": "OOMKilled",
-                                    "pod_name": pod_name,
-                                    "namespace": namespace,
-                                    "container": cs.name,
-                                    "restarts": cs.restart_count,
-                                })
+                                issues.append(
+                                    {
+                                        "type": "OOMKilled",
+                                        "pod_name": pod_name,
+                                        "namespace": namespace,
+                                        "container": cs.name,
+                                        "restarts": cs.restart_count,
+                                    }
+                                )
 
                         # CrashLoopBackOff detection
                         if cs.state and cs.state.waiting:
                             if cs.state.waiting.reason == "CrashLoopBackOff":
-                                issues.append({
-                                    "type": "CrashLoopBackOff",
-                                    "pod_name": pod_name,
-                                    "namespace": namespace,
-                                    "container": cs.name,
-                                    "restarts": cs.restart_count,
-                                })
+                                issues.append(
+                                    {
+                                        "type": "CrashLoopBackOff",
+                                        "pod_name": pod_name,
+                                        "namespace": namespace,
+                                        "container": cs.name,
+                                        "restarts": cs.restart_count,
+                                    }
+                                )
                             elif cs.state.waiting.reason == "ImagePullBackOff":
-                                issues.append({
-                                    "type": "ImagePullBackOff",
-                                    "pod_name": pod_name,
-                                    "namespace": namespace,
-                                    "container": cs.name,
-                                })
+                                issues.append(
+                                    {
+                                        "type": "ImagePullBackOff",
+                                        "pod_name": pod_name,
+                                        "namespace": namespace,
+                                        "container": cs.name,
+                                    }
+                                )
 
                 # Check for pending pods (scheduling issues)
                 if pod.status.phase == "Pending":
                     if pod.status.conditions:
                         for cond in pod.status.conditions:
                             if cond.type == "PodScheduled" and cond.status == "False":
-                                issues.append({
-                                    "type": "FailedScheduling",
-                                    "pod_name": pod_name,
-                                    "namespace": namespace,
-                                    "message": cond.message or "Unknown scheduling issue",
-                                })
+                                issues.append(
+                                    {
+                                        "type": "FailedScheduling",
+                                        "pod_name": pod_name,
+                                        "namespace": namespace,
+                                        "message": cond.message or "Unknown scheduling issue",
+                                    }
+                                )
 
         except ApiException as e:
             logger.error(f"Error checking pods: {e}")
@@ -206,25 +214,31 @@ class K8sWatcherService:
                     for cond in node.status.conditions:
                         # Node NotReady
                         if cond.type == "Ready" and cond.status != "True":
-                            issues.append({
-                                "type": "NodeNotReady",
-                                "node_name": node_name,
-                                "message": cond.message or "Node is not ready",
-                            })
+                            issues.append(
+                                {
+                                    "type": "NodeNotReady",
+                                    "node_name": node_name,
+                                    "message": cond.message or "Node is not ready",
+                                }
+                            )
 
                         # Memory Pressure
                         if cond.type == "MemoryPressure" and cond.status == "True":
-                            issues.append({
-                                "type": "NodeMemoryPressure",
-                                "node_name": node_name,
-                            })
+                            issues.append(
+                                {
+                                    "type": "NodeMemoryPressure",
+                                    "node_name": node_name,
+                                }
+                            )
 
                         # Disk Pressure
                         if cond.type == "DiskPressure" and cond.status == "True":
-                            issues.append({
-                                "type": "NodeDiskPressure",
-                                "node_name": node_name,
-                            })
+                            issues.append(
+                                {
+                                    "type": "NodeDiskPressure",
+                                    "node_name": node_name,
+                                }
+                            )
 
         except ApiException as e:
             logger.error(f"Error checking nodes: {e}")
@@ -253,26 +267,30 @@ class K8sWatcherService:
                     available = dep.status.available_replicas or 0
 
                     if available == 0 and desired > 0:
-                        issues.append({
-                            "type": "DeploymentUnavailable",
-                            "deployment": dep_name,
-                            "namespace": namespace,
-                            "desired": desired,
-                            "available": available,
-                            "message": f"Deployment has 0/{desired} available replicas",
-                        })
+                        issues.append(
+                            {
+                                "type": "DeploymentUnavailable",
+                                "deployment": dep_name,
+                                "namespace": namespace,
+                                "desired": desired,
+                                "available": available,
+                                "message": f"Deployment has 0/{desired} available replicas",
+                            }
+                        )
 
                 # Check conditions for progress deadline
                 if dep.status.conditions:
                     for cond in dep.status.conditions:
                         if cond.type == "Progressing" and cond.status == "False":
                             if "ProgressDeadlineExceeded" in (cond.reason or ""):
-                                issues.append({
-                                    "type": "ProgressDeadlineExceeded",
-                                    "deployment": dep_name,
-                                    "namespace": namespace,
-                                    "message": cond.message or "Deployment progress deadline exceeded",
-                                })
+                                issues.append(
+                                    {
+                                        "type": "ProgressDeadlineExceeded",
+                                        "deployment": dep_name,
+                                        "namespace": namespace,
+                                        "message": cond.message or "Deployment progress deadline exceeded",
+                                    }
+                                )
 
         except ApiException as e:
             logger.error(f"Error checking deployments: {e}")
@@ -305,13 +323,15 @@ class K8sWatcherService:
                 # Map event reason to issue type
                 reason = event.reason or ""
                 if reason in ALERT_RULES:
-                    issues.append({
-                        "type": reason,
-                        "pod_name": event.involved_object.name,
-                        "namespace": event.involved_object.namespace or "default",
-                        "message": event.message,
-                        "count": event.count or 1,
-                    })
+                    issues.append(
+                        {
+                            "type": reason,
+                            "pod_name": event.involved_object.name,
+                            "namespace": event.involved_object.namespace or "default",
+                            "message": event.message,
+                            "count": event.count or 1,
+                        }
+                    )
 
         except ApiException as e:
             logger.error(f"Error checking events: {e}")

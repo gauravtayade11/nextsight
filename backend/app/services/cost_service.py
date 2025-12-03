@@ -2,6 +2,7 @@
 Cost analysis service for Kubernetes resource cost tracking.
 Calculates costs based on resource usage and configurable pricing.
 """
+
 import logging
 import random
 import re
@@ -13,15 +14,15 @@ from kubernetes import client
 from kubernetes.client import ApiException
 
 from app.schemas.cost import (
+    ClusterCostSummary,
     CostBreakdown,
     CostConfig,
+    CostDashboardResponse,
     CostRecommendation,
     CostTrend,
-    ClusterCostSummary,
     NamespaceCost,
     PodCost,
     ResourceEfficiency,
-    CostDashboardResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,28 +62,28 @@ class CostService:
         value = str(value).strip()
 
         if resource_type == "cpu":
-            if value.endswith('m'):
+            if value.endswith("m"):
                 return float(value[:-1]) / 1000
-            elif value.endswith('n'):
+            elif value.endswith("n"):
                 return float(value[:-1]) / 1000000000
             else:
                 return float(value)
 
         elif resource_type == "memory":
             multipliers = {
-                'Ki': 1024,
-                'Mi': 1024 ** 2,
-                'Gi': 1024 ** 3,
-                'Ti': 1024 ** 4,
-                'K': 1000,
-                'M': 1000 ** 2,
-                'G': 1000 ** 3,
-                'T': 1000 ** 4,
+                "Ki": 1024,
+                "Mi": 1024**2,
+                "Gi": 1024**3,
+                "Ti": 1024**4,
+                "K": 1000,
+                "M": 1000**2,
+                "G": 1000**3,
+                "T": 1000**4,
             }
 
             for suffix, mult in multipliers.items():
                 if value.endswith(suffix):
-                    return float(value[:-len(suffix)]) * mult
+                    return float(value[: -len(suffix)]) * mult
 
             # Plain bytes
             try:
@@ -94,19 +95,17 @@ class CostService:
 
     def _bytes_to_gb(self, bytes_value: float) -> float:
         """Convert bytes to gigabytes."""
-        return bytes_value / (1024 ** 3)
+        return bytes_value / (1024**3)
 
     def _calculate_pod_hourly_cost(
-        self,
-        cpu_request: float,
-        memory_bytes: float,
-        storage_bytes: float = 0,
-        gpu_count: int = 0
+        self, cpu_request: float, memory_bytes: float, storage_bytes: float = 0, gpu_count: int = 0
     ) -> CostBreakdown:
         """Calculate hourly cost for a pod based on resource requests."""
         cpu_cost = cpu_request * self.config.cpu_hourly_cost
         memory_cost = self._bytes_to_gb(memory_bytes) * self.config.memory_gb_hourly_cost
-        storage_cost = (self._bytes_to_gb(storage_bytes) * self.config.storage_gb_monthly_cost) / 720  # Monthly to hourly
+        storage_cost = (
+            self._bytes_to_gb(storage_bytes) * self.config.storage_gb_monthly_cost
+        ) / 720  # Monthly to hourly
         gpu_cost = gpu_count * self.config.gpu_hourly_cost
 
         total = cpu_cost + memory_cost + storage_cost + gpu_cost
@@ -116,7 +115,7 @@ class CostService:
             memory=round(memory_cost, 4),
             storage=round(storage_cost, 4),
             gpu=round(gpu_cost, 4),
-            total=round(total, 4)
+            total=round(total, 4),
         )
 
     async def get_namespace_costs(self) -> List[NamespaceCost]:
@@ -136,11 +135,7 @@ class CostService:
             for pod in pods.items:
                 ns = pod.metadata.namespace
                 if ns not in namespace_costs:
-                    namespace_costs[ns] = {
-                        "costs": CostBreakdown(),
-                        "pod_count": 0,
-                        "deployments": set()
-                    }
+                    namespace_costs[ns] = {"costs": CostBreakdown(), "pod_count": 0, "deployments": set()}
 
                 # Sum up container resources
                 cpu_request = 0.0
@@ -166,7 +161,7 @@ class CostService:
                     memory=ns_cost.memory + pod_cost.memory,
                     storage=ns_cost.storage + pod_cost.storage,
                     gpu=ns_cost.gpu + pod_cost.gpu,
-                    total=ns_cost.total + pod_cost.total
+                    total=ns_cost.total + pod_cost.total,
                 )
                 namespace_costs[ns]["pod_count"] += 1
 
@@ -182,13 +177,15 @@ class CostService:
             # Build response
             result = []
             for ns, data in namespace_costs.items():
-                result.append(NamespaceCost(
-                    namespace=ns,
-                    costs=data["costs"],
-                    pod_count=data["pod_count"],
-                    deployment_count=len(data["deployments"]),
-                    percentage_of_total=round((data["costs"].total / total_cost * 100) if total_cost > 0 else 0, 2)
-                ))
+                result.append(
+                    NamespaceCost(
+                        namespace=ns,
+                        costs=data["costs"],
+                        pod_count=data["pod_count"],
+                        deployment_count=len(data["deployments"]),
+                        percentage_of_total=round((data["costs"].total / total_cost * 100) if total_cost > 0 else 0, 2),
+                    )
+                )
 
             # Sort by cost descending
             result.sort(key=lambda x: x.costs.total, reverse=True)
@@ -219,15 +216,11 @@ class CostService:
             NamespaceCost(
                 namespace=ns,
                 costs=CostBreakdown(
-                    cpu=cost * 0.6,
-                    memory=cost * 0.3,
-                    storage=cost * 0.08,
-                    network=cost * 0.02,
-                    total=cost
+                    cpu=cost * 0.6, memory=cost * 0.3, storage=cost * 0.08, network=cost * 0.02, total=cost
                 ),
                 pod_count=pods,
                 deployment_count=deps,
-                percentage_of_total=round(cost / total * 100, 2)
+                percentage_of_total=round(cost / total * 100, 2),
             )
             for ns, cost, pods, deps in namespaces
         ]
@@ -281,18 +274,20 @@ class CostService:
                 else:
                     age = "Unknown"
 
-                pod_costs.append(PodCost(
-                    name=pod.metadata.name,
-                    namespace=pod.metadata.namespace,
-                    costs=costs,
-                    cpu_request=f"{cpu_request:.2f}",
-                    cpu_limit=f"{cpu_limit:.2f}",
-                    memory_request=f"{self._bytes_to_gb(memory_request):.2f}Gi",
-                    memory_limit=f"{self._bytes_to_gb(memory_limit):.2f}Gi",
-                    age=age,
-                    owner_kind=owner_kind,
-                    owner_name=owner_name
-                ))
+                pod_costs.append(
+                    PodCost(
+                        name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        costs=costs,
+                        cpu_request=f"{cpu_request:.2f}",
+                        cpu_limit=f"{cpu_limit:.2f}",
+                        memory_request=f"{self._bytes_to_gb(memory_request):.2f}Gi",
+                        memory_limit=f"{self._bytes_to_gb(memory_limit):.2f}Gi",
+                        age=age,
+                        owner_kind=owner_kind,
+                        owner_name=owner_name,
+                    )
+                )
 
             # Sort by cost and return top N
             pod_costs.sort(key=lambda x: x.costs.total, reverse=True)
@@ -305,16 +300,93 @@ class CostService:
     def _get_demo_pod_costs(self, limit: int = 10) -> List[PodCost]:
         """Return demo pod costs."""
         demo_pods = [
-            ("api-server-7d8b9c6f-xk2p3", "production", 2.34, "500m", "1", "1Gi", "2Gi", "15d", "ReplicaSet", "api-server-7d8b9c6f"),
-            ("web-frontend-5c4d3e2f-lm9n8", "production", 1.87, "250m", "500m", "512Mi", "1Gi", "15d", "ReplicaSet", "web-frontend-5c4d3e2f"),
+            (
+                "api-server-7d8b9c6f-xk2p3",
+                "production",
+                2.34,
+                "500m",
+                "1",
+                "1Gi",
+                "2Gi",
+                "15d",
+                "ReplicaSet",
+                "api-server-7d8b9c6f",
+            ),
+            (
+                "web-frontend-5c4d3e2f-lm9n8",
+                "production",
+                1.87,
+                "250m",
+                "500m",
+                "512Mi",
+                "1Gi",
+                "15d",
+                "ReplicaSet",
+                "web-frontend-5c4d3e2f",
+            ),
             ("postgres-0", "production", 1.56, "1", "2", "2Gi", "4Gi", "30d", "StatefulSet", "postgres"),
-            ("redis-master-0", "production", 0.98, "200m", "500m", "256Mi", "512Mi", "30d", "StatefulSet", "redis-master"),
-            ("worker-6f5e4d3c-ab1c2", "production", 0.87, "400m", "800m", "512Mi", "1Gi", "10d", "ReplicaSet", "worker-6f5e4d3c"),
+            (
+                "redis-master-0",
+                "production",
+                0.98,
+                "200m",
+                "500m",
+                "256Mi",
+                "512Mi",
+                "30d",
+                "StatefulSet",
+                "redis-master",
+            ),
+            (
+                "worker-6f5e4d3c-ab1c2",
+                "production",
+                0.87,
+                "400m",
+                "800m",
+                "512Mi",
+                "1Gi",
+                "10d",
+                "ReplicaSet",
+                "worker-6f5e4d3c",
+            ),
             ("prometheus-0", "monitoring", 0.76, "500m", "1", "1Gi", "2Gi", "45d", "StatefulSet", "prometheus"),
-            ("grafana-7a8b9c0d-xy1z2", "monitoring", 0.54, "100m", "200m", "256Mi", "512Mi", "45d", "ReplicaSet", "grafana-7a8b9c0d"),
+            (
+                "grafana-7a8b9c0d-xy1z2",
+                "monitoring",
+                0.54,
+                "100m",
+                "200m",
+                "256Mi",
+                "512Mi",
+                "45d",
+                "ReplicaSet",
+                "grafana-7a8b9c0d",
+            ),
             ("elasticsearch-0", "monitoring", 0.89, "500m", "1", "2Gi", "4Gi", "20d", "StatefulSet", "elasticsearch"),
-            ("test-app-1a2b3c4d-ef5g6", "staging", 0.45, "100m", "200m", "128Mi", "256Mi", "5d", "ReplicaSet", "test-app-1a2b3c4d"),
-            ("dev-service-8h9i0j1k-mn2o3", "development", 0.32, "50m", "100m", "64Mi", "128Mi", "2d", "ReplicaSet", "dev-service-8h9i0j1k"),
+            (
+                "test-app-1a2b3c4d-ef5g6",
+                "staging",
+                0.45,
+                "100m",
+                "200m",
+                "128Mi",
+                "256Mi",
+                "5d",
+                "ReplicaSet",
+                "test-app-1a2b3c4d",
+            ),
+            (
+                "dev-service-8h9i0j1k-mn2o3",
+                "development",
+                0.32,
+                "50m",
+                "100m",
+                "64Mi",
+                "128Mi",
+                "2d",
+                "ReplicaSet",
+                "dev-service-8h9i0j1k",
+            ),
         ]
 
         return [
@@ -328,7 +400,7 @@ class CostService:
                 memory_limit=mem_lim,
                 age=age,
                 owner_kind=owner_kind,
-                owner_name=owner_name
+                owner_name=owner_name,
             )
             for name, ns, cost, cpu_req, cpu_lim, mem_req, mem_lim, age, owner_kind, owner_name in demo_pods[:limit]
         ]
@@ -346,16 +418,18 @@ class CostService:
             variation = random.uniform(0.85, 1.15)
             daily_cost = base_cost * variation
 
-            trends.append(CostTrend(
-                timestamp=timestamp,
-                costs=CostBreakdown(
-                    cpu=daily_cost * 0.55,
-                    memory=daily_cost * 0.30,
-                    storage=daily_cost * 0.10,
-                    network=daily_cost * 0.05,
-                    total=daily_cost
+            trends.append(
+                CostTrend(
+                    timestamp=timestamp,
+                    costs=CostBreakdown(
+                        cpu=daily_cost * 0.55,
+                        memory=daily_cost * 0.30,
+                        storage=daily_cost * 0.10,
+                        network=daily_cost * 0.05,
+                        total=daily_cost,
+                    ),
                 )
-            ))
+            )
 
         return trends
 
@@ -375,7 +449,7 @@ class CostService:
                 current_cost=45.23,
                 estimated_savings=12.50,
                 percentage_savings=27.6,
-                action="Reduce CPU requests from 500m to 200m"
+                action="Reduce CPU requests from 500m to 200m",
             ),
             CostRecommendation(
                 id=str(uuid.uuid4()),
@@ -389,7 +463,7 @@ class CostService:
                 current_cost=15.67,
                 estimated_savings=10.00,
                 percentage_savings=63.8,
-                action="Scale down or terminate unused pods"
+                action="Scale down or terminate unused pods",
             ),
             CostRecommendation(
                 id=str(uuid.uuid4()),
@@ -403,7 +477,7 @@ class CostService:
                 current_cost=23.45,
                 estimated_savings=8.20,
                 percentage_savings=35.0,
-                action="Reduce memory limits from 2Gi to 768Mi"
+                action="Reduce memory limits from 2Gi to 768Mi",
             ),
             CostRecommendation(
                 id=str(uuid.uuid4()),
@@ -417,7 +491,7 @@ class CostService:
                 current_cost=100.69,
                 estimated_savings=20.14,
                 percentage_savings=20.0,
-                action="Purchase reserved node capacity"
+                action="Purchase reserved node capacity",
             ),
         ]
 
@@ -435,7 +509,7 @@ class CostService:
                 used=0.18,
                 limit=1.0,
                 efficiency_percentage=36.0,
-                waste_cost=7.50
+                waste_cost=7.50,
             ),
             ResourceEfficiency(
                 name="api-server",
@@ -445,7 +519,7 @@ class CostService:
                 used=429496729,  # ~400Mi
                 limit=2147483648,  # 2Gi
                 efficiency_percentage=40.0,
-                waste_cost=3.20
+                waste_cost=3.20,
             ),
             ResourceEfficiency(
                 name="postgres",
@@ -455,7 +529,7 @@ class CostService:
                 used=0.65,
                 limit=2.0,
                 efficiency_percentage=65.0,
-                waste_cost=8.10
+                waste_cost=8.10,
             ),
             ResourceEfficiency(
                 name="web-frontend",
@@ -465,7 +539,7 @@ class CostService:
                 used=134217728,  # ~128Mi
                 limit=1073741824,  # 1Gi
                 efficiency_percentage=25.0,
-                waste_cost=4.50
+                waste_cost=4.50,
             ),
         ]
 
@@ -490,7 +564,7 @@ class CostService:
             storage=sum(ns.costs.storage for ns in namespace_costs),
             network=sum(ns.costs.network for ns in namespace_costs),
             gpu=sum(ns.costs.gpu for ns in namespace_costs),
-            total=total_hourly
+            total=total_hourly,
         )
 
         summary = ClusterCostSummary(
@@ -501,7 +575,7 @@ class CostService:
             top_costly_pods=top_pods,
             config=self.config,
             period_start=datetime.utcnow() - timedelta(days=30),
-            period_end=datetime.utcnow()
+            period_end=datetime.utcnow(),
         )
 
         return CostDashboardResponse(
@@ -510,7 +584,7 @@ class CostService:
             recommendations=recommendations,
             efficiency_metrics=efficiency,
             total_monthly_estimate=round(total_monthly, 2),
-            total_annual_estimate=round(total_annual, 2)
+            total_annual_estimate=round(total_annual, 2),
         )
 
 

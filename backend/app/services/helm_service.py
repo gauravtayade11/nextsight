@@ -2,13 +2,15 @@
 Helm service for managing Helm chart deployments.
 Executes Helm CLI commands via subprocess and parses output.
 """
+
 import asyncio
 import json
+import logging
 import subprocess
-import yaml
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-import logging
+
+import yaml
 
 from app.schemas.helm import (
     ChartInfo,
@@ -59,11 +61,7 @@ class HelmService:
             cmd.extend(["--kube-context", self.context])
         return cmd
 
-    async def _run_helm_cmd(
-        self,
-        args: List[str],
-        timeout: int = 300
-    ) -> Tuple[bool, str, str]:
+    async def _run_helm_cmd(self, args: List[str], timeout: int = 300) -> Tuple[bool, str, str]:
         """
         Run a helm command asynchronously.
 
@@ -75,14 +73,9 @@ class HelmService:
 
         try:
             process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=timeout
-            )
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
 
             success = process.returncode == 0
             return success, stdout.decode(), stderr.decode()
@@ -92,11 +85,7 @@ class HelmService:
             logger.error(f"Helm command failed: {e}")
             return False, "", str(e)
 
-    def _run_helm_cmd_sync(
-        self,
-        args: List[str],
-        timeout: int = 300
-    ) -> Tuple[bool, str, str]:
+    def _run_helm_cmd_sync(self, args: List[str], timeout: int = 300) -> Tuple[bool, str, str]:
         """
         Run a helm command synchronously (for non-async contexts).
         """
@@ -104,12 +93,7 @@ class HelmService:
         logger.debug(f"Running helm command: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
             success = result.returncode == 0
             return success, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
@@ -153,11 +137,7 @@ class HelmService:
         except Exception:
             return None
 
-    async def list_releases(
-        self,
-        namespace: Optional[str] = None,
-        all_namespaces: bool = True
-    ) -> List[ReleaseInfo]:
+    async def list_releases(self, namespace: Optional[str] = None, all_namespaces: bool = True) -> List[ReleaseInfo]:
         """
         List all Helm releases.
 
@@ -189,16 +169,18 @@ class HelmService:
                 chart_name = chart_parts[0] if chart_parts else chart_full
                 chart_version = chart_parts[1] if len(chart_parts) > 1 else ""
 
-                releases.append(ReleaseInfo(
-                    name=r.get("name", ""),
-                    namespace=r.get("namespace", "default"),
-                    revision=r.get("revision", 1),
-                    status=self._parse_release_status(r.get("status", "")),
-                    chart=chart_name,
-                    chart_version=chart_version,
-                    app_version=r.get("app_version"),
-                    updated=self._parse_datetime(r.get("updated", "")),
-                ))
+                releases.append(
+                    ReleaseInfo(
+                        name=r.get("name", ""),
+                        namespace=r.get("namespace", "default"),
+                        revision=r.get("revision", 1),
+                        status=self._parse_release_status(r.get("status", "")),
+                        chart=chart_name,
+                        chart_version=chart_version,
+                        app_version=r.get("app_version"),
+                        updated=self._parse_datetime(r.get("updated", "")),
+                    )
+                )
 
             return releases
         except json.JSONDecodeError as e:
@@ -255,15 +237,17 @@ class HelmService:
                 chart_name = chart_parts[0] if chart_parts else chart_full
                 chart_version = chart_parts[1] if len(chart_parts) > 1 else ""
 
-                history.append(ReleaseHistory(
-                    revision=h.get("revision", 0),
-                    status=self._parse_release_status(h.get("status", "")),
-                    chart=chart_name,
-                    chart_version=chart_version,
-                    app_version=h.get("app_version"),
-                    updated=self._parse_datetime(h.get("updated", "")) or datetime.now(),
-                    description=h.get("description"),
-                ))
+                history.append(
+                    ReleaseHistory(
+                        revision=h.get("revision", 0),
+                        status=self._parse_release_status(h.get("status", "")),
+                        chart=chart_name,
+                        chart_version=chart_version,
+                        app_version=h.get("app_version"),
+                        updated=self._parse_datetime(h.get("updated", "")) or datetime.now(),
+                        description=h.get("description"),
+                    )
+                )
 
             return sorted(history, key=lambda x: x.revision, reverse=True)
         except json.JSONDecodeError as e:
@@ -271,10 +255,7 @@ class HelmService:
             return []
 
     async def get_release_values(
-        self,
-        name: str,
-        namespace: str = "default",
-        all_values: bool = False
+        self, name: str, namespace: str = "default", all_values: bool = False
     ) -> ReleaseValues:
         """Get values for a release."""
         args = ["get", "values", name, "-n", namespace, "-o", "json"]
@@ -333,10 +314,7 @@ class HelmService:
         success, stdout, stderr = await self._run_helm_cmd(args, timeout=request.timeout + 30)
 
         if not success:
-            return HelmOperationResult(
-                success=False,
-                message=f"Installation failed: {stderr}"
-            )
+            return HelmOperationResult(success=False, message=f"Installation failed: {stderr}")
 
         try:
             data = json.loads(stdout)
@@ -362,26 +340,15 @@ class HelmService:
                 notes=info.get("notes"),
             )
         except json.JSONDecodeError:
-            return HelmOperationResult(
-                success=True,
-                message="Chart installed (unable to parse response)"
-            )
+            return HelmOperationResult(success=True, message="Chart installed (unable to parse response)")
 
-    async def upgrade(
-        self,
-        name: str,
-        namespace: str,
-        request: UpgradeRequest
-    ) -> HelmOperationResult:
+    async def upgrade(self, name: str, namespace: str, request: UpgradeRequest) -> HelmOperationResult:
         """Upgrade a Helm release."""
         # Get current chart if not specified
         if not request.chart:
             current = await self.get_release(name, namespace)
             if not current:
-                return HelmOperationResult(
-                    success=False,
-                    message=f"Release {name} not found in namespace {namespace}"
-                )
+                return HelmOperationResult(success=False, message=f"Release {name} not found in namespace {namespace}")
             request.chart = current.chart
 
         args = ["upgrade", name, request.chart]
@@ -419,10 +386,7 @@ class HelmService:
         success, stdout, stderr = await self._run_helm_cmd(args, timeout=request.timeout + 30)
 
         if not success:
-            return HelmOperationResult(
-                success=False,
-                message=f"Upgrade failed: {stderr}"
-            )
+            return HelmOperationResult(success=False, message=f"Upgrade failed: {stderr}")
 
         try:
             data = json.loads(stdout)
@@ -448,17 +412,9 @@ class HelmService:
                 notes=info.get("notes"),
             )
         except json.JSONDecodeError:
-            return HelmOperationResult(
-                success=True,
-                message="Release upgraded (unable to parse response)"
-            )
+            return HelmOperationResult(success=True, message="Release upgraded (unable to parse response)")
 
-    async def rollback(
-        self,
-        name: str,
-        namespace: str,
-        request: RollbackRequest
-    ) -> HelmOperationResult:
+    async def rollback(self, name: str, namespace: str, request: RollbackRequest) -> HelmOperationResult:
         """Rollback a release to a specific revision."""
         args = ["rollback", name, str(request.revision)]
         args.extend(["-n", namespace])
@@ -477,10 +433,7 @@ class HelmService:
         success, stdout, stderr = await self._run_helm_cmd(args, timeout=request.timeout + 30)
 
         if not success:
-            return HelmOperationResult(
-                success=False,
-                message=f"Rollback failed: {stderr}"
-            )
+            return HelmOperationResult(success=False, message=f"Rollback failed: {stderr}")
 
         # Get updated release info
         release = await self.get_release(name, namespace)
@@ -491,12 +444,7 @@ class HelmService:
             release=release,
         )
 
-    async def uninstall(
-        self,
-        name: str,
-        namespace: str,
-        request: UninstallRequest
-    ) -> HelmOperationResult:
+    async def uninstall(self, name: str, namespace: str, request: UninstallRequest) -> HelmOperationResult:
         """Uninstall a Helm release."""
         args = ["uninstall", name]
         args.extend(["-n", namespace])
@@ -512,10 +460,7 @@ class HelmService:
         success, stdout, stderr = await self._run_helm_cmd(args, timeout=request.timeout + 30)
 
         if not success:
-            return HelmOperationResult(
-                success=False,
-                message=f"Uninstall failed: {stderr}"
-            )
+            return HelmOperationResult(success=False, message=f"Uninstall failed: {stderr}")
 
         return HelmOperationResult(
             success=True,
@@ -534,10 +479,7 @@ class HelmService:
 
         try:
             repos_data = json.loads(stdout) if stdout.strip() else []
-            return [
-                Repository(name=r.get("name", ""), url=r.get("url", ""))
-                for r in repos_data
-            ]
+            return [Repository(name=r.get("name", ""), url=r.get("url", "")) for r in repos_data]
         except json.JSONDecodeError:
             return self._default_repositories
 
@@ -567,11 +509,7 @@ class HelmService:
 
         return True
 
-    async def search_charts(
-        self,
-        query: str,
-        repository: Optional[str] = None
-    ) -> List[ChartSearchResult]:
+    async def search_charts(self, query: str, repository: Optional[str] = None) -> List[ChartSearchResult]:
         """Search for charts in repositories."""
         args = ["search", "repo", query, "-o", "json"]
 
@@ -597,13 +535,15 @@ class HelmService:
                     repo = ""
                     chart_name = name_full
 
-                results.append(ChartSearchResult(
-                    name=chart_name,
-                    version=c.get("version", ""),
-                    app_version=c.get("app_version"),
-                    description=c.get("description"),
-                    repository=repo,
-                ))
+                results.append(
+                    ChartSearchResult(
+                        name=chart_name,
+                        version=c.get("version", ""),
+                        app_version=c.get("app_version"),
+                        description=c.get("description"),
+                        repository=repo,
+                    )
+                )
 
             return results
         except json.JSONDecodeError:
@@ -659,11 +599,7 @@ class HelmService:
         except yaml.YAMLError:
             return {}
 
-    def _flatten_dict(
-        self,
-        d: Dict[str, Any],
-        parent_key: str = ""
-    ) -> List[Tuple[str, Any]]:
+    def _flatten_dict(self, d: Dict[str, Any], parent_key: str = "") -> List[Tuple[str, Any]]:
         """Flatten a nested dictionary for Helm --set arguments."""
         items = []
         for k, v in d.items():

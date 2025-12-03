@@ -1,16 +1,14 @@
-from typing import List, Optional, Dict, Any
+import logging
+import os
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from kubernetes.config import list_kube_config_contexts
-import logging
-import os
 
 from app.core.config import settings
-from app.schemas.cluster import (
-    ClusterConfig, ClusterInfo, ClusterHealth, ClusterStatus,
-    ClusterContextInfo
-)
+from app.schemas.cluster import ClusterConfig, ClusterContextInfo, ClusterHealth, ClusterInfo, ClusterStatus
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +36,8 @@ class ClusterService:
             contexts, active_context = list_kube_config_contexts(config_file=config_path)
 
             for ctx in contexts:
-                ctx_name = ctx.get('name', 'unknown')
-                cluster_id = ctx_name.replace(' ', '-').lower()
+                ctx_name = ctx.get("name", "unknown")
+                cluster_id = ctx_name.replace(" ", "-").lower()
 
                 self._clusters[cluster_id] = ClusterConfig(
                     id=cluster_id,
@@ -47,22 +45,19 @@ class ClusterService:
                     context=ctx_name,
                     kubeconfig_path=config_path,
                     in_cluster=False,
-                    is_default=(ctx_name == active_context.get('name'))
+                    is_default=(ctx_name == active_context.get("name")),
                 )
 
-                if ctx_name == active_context.get('name'):
+                if ctx_name == active_context.get("name"):
                     self._active_cluster_id = cluster_id
 
             # If running in-cluster, add that as well
             if settings.K8S_IN_CLUSTER:
-                self._clusters['in-cluster'] = ClusterConfig(
-                    id='in-cluster',
-                    name='In-Cluster',
-                    in_cluster=True,
-                    is_default=True
+                self._clusters["in-cluster"] = ClusterConfig(
+                    id="in-cluster", name="In-Cluster", in_cluster=True, is_default=True
                 )
                 if not self._active_cluster_id:
-                    self._active_cluster_id = 'in-cluster'
+                    self._active_cluster_id = "in-cluster"
 
             self._initialized = True
             logger.info(f"Initialized {len(self._clusters)} cluster(s)")
@@ -70,15 +65,15 @@ class ClusterService:
         except Exception as e:
             logger.error(f"Failed to initialize clusters: {e}")
             # Create a default cluster from settings
-            self._clusters['default'] = ClusterConfig(
-                id='default',
-                name='Default Cluster',
+            self._clusters["default"] = ClusterConfig(
+                id="default",
+                name="Default Cluster",
                 kubeconfig_path=settings.K8S_CONFIG_PATH,
                 in_cluster=settings.K8S_IN_CLUSTER,
                 host_override=settings.K8S_HOST_OVERRIDE,
-                is_default=True
+                is_default=True,
             )
-            self._active_cluster_id = 'default'
+            self._active_cluster_id = "default"
             self._initialized = True
 
     def _get_client(self, cluster_id: str) -> Dict[str, Any]:
@@ -99,10 +94,7 @@ class ClusterService:
                 config_path = cluster.kubeconfig_path
                 if config_path:
                     config_path = os.path.expanduser(config_path)
-                config.load_kube_config(
-                    config_file=config_path,
-                    context=cluster.context
-                )
+                config.load_kube_config(config_file=config_path, context=cluster.context)
             else:
                 config.load_kube_config()
 
@@ -110,19 +102,17 @@ class ClusterService:
             if cluster.host_override:
                 configuration = client.Configuration.get_default_copy()
                 if configuration.host:
-                    configuration.host = configuration.host.replace(
-                        '127.0.0.1', cluster.host_override
-                    ).replace(
-                        'localhost', cluster.host_override
+                    configuration.host = configuration.host.replace("127.0.0.1", cluster.host_override).replace(
+                        "localhost", cluster.host_override
                     )
                     client.Configuration.set_default(configuration)
 
             api_client = client.ApiClient()
             self._clients[cluster_id] = {
-                'api_client': api_client,
-                'core_v1': client.CoreV1Api(api_client),
-                'apps_v1': client.AppsV1Api(api_client),
-                'version': client.VersionApi(api_client),
+                "api_client": api_client,
+                "core_v1": client.CoreV1Api(api_client),
+                "apps_v1": client.AppsV1Api(api_client),
+                "version": client.VersionApi(api_client),
             }
 
             return self._clients[cluster_id]
@@ -139,8 +129,8 @@ class ClusterService:
         for cluster_id, cluster_config in self._clusters.items():
             try:
                 clients = self._get_client(cluster_id)
-                core_v1 = clients['core_v1']
-                version_api = clients['version']
+                core_v1 = clients["core_v1"]
+                version_api = clients["version"]
 
                 # Get cluster version
                 version_info = version_api.get_code()
@@ -151,28 +141,32 @@ class ClusterService:
                 nodes = core_v1.list_node()
                 namespaces = core_v1.list_namespace()
 
-                clusters.append(ClusterInfo(
-                    id=cluster_id,
-                    name=cluster_config.name,
-                    context=cluster_config.context,
-                    status=ClusterStatus.CONNECTED,
-                    is_active=(cluster_id == self._active_cluster_id),
-                    is_default=cluster_config.is_default,
-                    version=version,
-                    platform=platform,
-                    node_count=len(nodes.items),
-                    namespace_count=len(namespaces.items)
-                ))
+                clusters.append(
+                    ClusterInfo(
+                        id=cluster_id,
+                        name=cluster_config.name,
+                        context=cluster_config.context,
+                        status=ClusterStatus.CONNECTED,
+                        is_active=(cluster_id == self._active_cluster_id),
+                        is_default=cluster_config.is_default,
+                        version=version,
+                        platform=platform,
+                        node_count=len(nodes.items),
+                        namespace_count=len(namespaces.items),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Failed to get status for cluster {cluster_id}: {e}")
-                clusters.append(ClusterInfo(
-                    id=cluster_id,
-                    name=cluster_config.name,
-                    context=cluster_config.context,
-                    status=ClusterStatus.DISCONNECTED,
-                    is_active=(cluster_id == self._active_cluster_id),
-                    is_default=cluster_config.is_default
-                ))
+                clusters.append(
+                    ClusterInfo(
+                        id=cluster_id,
+                        name=cluster_config.name,
+                        context=cluster_config.context,
+                        status=ClusterStatus.DISCONNECTED,
+                        is_active=(cluster_id == self._active_cluster_id),
+                        is_default=cluster_config.is_default,
+                    )
+                )
 
         return clusters
 
@@ -186,8 +180,8 @@ class ClusterService:
 
         try:
             clients = self._get_client(cluster_id)
-            core_v1 = clients['core_v1']
-            version_api = clients['version']
+            core_v1 = clients["core_v1"]
+            version_api = clients["version"]
 
             version_info = version_api.get_code()
             nodes = core_v1.list_node()
@@ -203,7 +197,7 @@ class ClusterService:
                 version=version_info.git_version,
                 platform=version_info.platform,
                 node_count=len(nodes.items),
-                namespace_count=len(namespaces.items)
+                namespace_count=len(namespaces.items),
             )
         except Exception as e:
             logger.error(f"Failed to get cluster {cluster_id}: {e}")
@@ -213,7 +207,7 @@ class ClusterService:
                 context=cluster_config.context,
                 status=ClusterStatus.ERROR,
                 is_active=(cluster_id == self._active_cluster_id),
-                is_default=cluster_config.is_default
+                is_default=cluster_config.is_default,
             )
 
     async def get_cluster_health(self, cluster_id: str) -> ClusterHealth:
@@ -227,12 +221,12 @@ class ClusterService:
                 healthy=False,
                 status=ClusterStatus.ERROR,
                 error="Cluster not found",
-                checked_at=datetime.now(timezone.utc)
+                checked_at=datetime.now(timezone.utc),
             )
 
         try:
             clients = self._get_client(cluster_id)
-            core_v1 = clients['core_v1']
+            core_v1 = clients["core_v1"]
 
             nodes = core_v1.list_node()
             pods = core_v1.list_pod_for_all_namespaces()
@@ -266,7 +260,7 @@ class ClusterService:
                 running_pods=running_pods,
                 namespaces=len(namespaces.items),
                 warnings=warnings,
-                checked_at=datetime.now(timezone.utc)
+                checked_at=datetime.now(timezone.utc),
             )
 
         except Exception as e:
@@ -276,7 +270,7 @@ class ClusterService:
                 healthy=False,
                 status=ClusterStatus.ERROR,
                 error=str(e),
-                checked_at=datetime.now(timezone.utc)
+                checked_at=datetime.now(timezone.utc),
             )
 
     async def set_active_cluster(self, cluster_id: str) -> bool:
@@ -315,10 +309,10 @@ class ClusterService:
 
             return [
                 ClusterContextInfo(
-                    name=ctx.get('name', 'unknown'),
-                    cluster=ctx.get('context', {}).get('cluster', 'unknown'),
-                    user=ctx.get('context', {}).get('user', 'unknown'),
-                    namespace=ctx.get('context', {}).get('namespace')
+                    name=ctx.get("name", "unknown"),
+                    cluster=ctx.get("context", {}).get("cluster", "unknown"),
+                    user=ctx.get("context", {}).get("user", "unknown"),
+                    namespace=ctx.get("context", {}).get("namespace"),
                 )
                 for ctx in contexts
             ]

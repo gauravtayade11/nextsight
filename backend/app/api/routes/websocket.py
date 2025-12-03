@@ -1,8 +1,10 @@
 """WebSocket endpoints for real-time features."""
+
 import asyncio
 import logging
 from typing import Optional
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from kubernetes.client.rest import ApiException
 
 from app.core.websocket_manager import ws_manager
@@ -19,7 +21,7 @@ async def websocket_pod_logs(
     pod_name: str,
     container: Optional[str] = Query(None),
     tail_lines: int = Query(100, ge=1, le=1000),
-    timestamps: bool = Query(False)
+    timestamps: bool = Query(False),
 ):
     """
     WebSocket endpoint for real-time pod log streaming.
@@ -43,37 +45,25 @@ async def websocket_pod_logs(
                     container = pod_info.containers[0]
                 else:
                     await websocket.accept()
-                    await websocket.send_json({
-                        "type": "error",
-                        "error": f"Pod {pod_name} not found or has no containers",
-                        "code": 404
-                    })
+                    await websocket.send_json(
+                        {"type": "error", "error": f"Pod {pod_name} not found or has no containers", "code": 404}
+                    )
                     await websocket.close()
                     return
             except Exception as e:
                 await websocket.accept()
-                await websocket.send_json({
-                    "type": "error",
-                    "error": str(e),
-                    "code": 500
-                })
+                await websocket.send_json({"type": "error", "error": str(e), "code": 500})
                 await websocket.close()
                 return
 
         # Register connection
         connection_id = await ws_manager.connect(
-            websocket=websocket,
-            namespace=namespace,
-            pod_name=pod_name,
-            container=container,
-            timestamps=timestamps
+            websocket=websocket, namespace=namespace, pod_name=pod_name, container=container, timestamps=timestamps
         )
 
         # Send connection status
         await ws_manager.send_status(
-            connection_id,
-            "connected",
-            f"Streaming logs from {namespace}/{pod_name}/{container}"
+            connection_id, "connected", f"Streaming logs from {namespace}/{pod_name}/{container}"
         )
 
         # Create and start the log streaming task
@@ -105,12 +95,7 @@ async def websocket_pod_logs(
 
 
 async def stream_logs(
-    connection_id: str,
-    namespace: str,
-    pod_name: str,
-    container: str,
-    tail_lines: int,
-    timestamps: bool
+    connection_id: str, namespace: str, pod_name: str, container: str, tail_lines: int, timestamps: bool
 ):
     """Stream logs from a pod to a WebSocket connection."""
     try:
@@ -121,7 +106,7 @@ async def stream_logs(
             container=container,
             tail_lines=tail_lines,
             timestamps=timestamps,
-            follow=True
+            follow=True,
         ):
             conn = ws_manager.get_connection(connection_id)
             if not conn:

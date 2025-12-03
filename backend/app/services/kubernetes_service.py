@@ -1,21 +1,43 @@
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
-from kubernetes import client, config
-from kubernetes.client.rest import ApiException
 import logging
 import os
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 
 from app.core.config import settings
 from app.schemas.kubernetes import (
-    NamespaceInfo, PodInfo, DeploymentInfo, ServiceInfo,
-    K8sEvent, K8sClusterHealth, PodPhase,
-    NodeInfo, NodeCondition, NodeResources,
-    PodMetrics, NodeMetrics, ClusterMetrics, ContainerMetrics,
-    PodLogResponse, PodExecResponse,
-    IngressInfo, IngressRule, ConfigMapInfo, SecretInfo,
-    PVCInfo, StatefulSetInfo, DaemonSetInfo, JobInfo, CronJobInfo, HPAInfo,
-    YAMLApplyResponse, AppliedResourceInfo,
-    KubectlResponse, ShellResponse
+    AppliedResourceInfo,
+    ClusterMetrics,
+    ConfigMapInfo,
+    ContainerMetrics,
+    CronJobInfo,
+    DaemonSetInfo,
+    DeploymentInfo,
+    HPAInfo,
+    IngressInfo,
+    IngressRule,
+    JobInfo,
+    K8sClusterHealth,
+    K8sEvent,
+    KubectlResponse,
+    NamespaceInfo,
+    NodeCondition,
+    NodeInfo,
+    NodeMetrics,
+    NodeResources,
+    PodExecResponse,
+    PodInfo,
+    PodLogResponse,
+    PodMetrics,
+    PodPhase,
+    PVCInfo,
+    SecretInfo,
+    ServiceInfo,
+    ShellResponse,
+    StatefulSetInfo,
+    YAMLApplyResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,10 +72,8 @@ class KubernetesService:
                 configuration = client.Configuration.get_default_copy()
                 if configuration.host:
                     # Replace localhost/127.0.0.1 with override host
-                    configuration.host = configuration.host.replace(
-                        '127.0.0.1', settings.K8S_HOST_OVERRIDE
-                    ).replace(
-                        'localhost', settings.K8S_HOST_OVERRIDE
+                    configuration.host = configuration.host.replace("127.0.0.1", settings.K8S_HOST_OVERRIDE).replace(
+                        "localhost", settings.K8S_HOST_OVERRIDE
                     )
                     client.Configuration.set_default(configuration)
                     logger.info(f"K8s host overridden to: {configuration.host}")
@@ -96,7 +116,7 @@ class KubernetesService:
                     name=ns.metadata.name,
                     status=ns.status.phase,
                     created_at=ns.metadata.creation_timestamp,
-                    labels=ns.metadata.labels or {}
+                    labels=ns.metadata.labels or {},
                 )
                 for ns in namespaces.items
             ]
@@ -114,26 +134,23 @@ class KubernetesService:
 
             result = []
             for pod in pods.items:
-                ready_containers = sum(
-                    1 for cs in (pod.status.container_statuses or [])
-                    if cs.ready
-                )
+                ready_containers = sum(1 for cs in (pod.status.container_statuses or []) if cs.ready)
                 total_containers = len(pod.spec.containers)
-                restarts = sum(
-                    cs.restart_count for cs in (pod.status.container_statuses or [])
-                )
+                restarts = sum(cs.restart_count for cs in (pod.status.container_statuses or []))
 
-                result.append(PodInfo(
-                    name=pod.metadata.name,
-                    namespace=pod.metadata.namespace,
-                    status=PodPhase(pod.status.phase),
-                    ready=ready_containers == total_containers,
-                    restarts=restarts,
-                    age=self._calculate_age(pod.metadata.creation_timestamp),
-                    node=pod.spec.node_name,
-                    ip=pod.status.pod_ip,
-                    containers=[c.name for c in pod.spec.containers]
-                ))
+                result.append(
+                    PodInfo(
+                        name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        status=PodPhase(pod.status.phase),
+                        ready=ready_containers == total_containers,
+                        restarts=restarts,
+                        age=self._calculate_age(pod.metadata.creation_timestamp),
+                        node=pod.spec.node_name,
+                        ip=pod.status.pod_ip,
+                        containers=[c.name for c in pod.spec.containers],
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing pods: {e}")
@@ -153,16 +170,18 @@ class KubernetesService:
                 if dep.spec.template.spec.containers:
                     image = dep.spec.template.spec.containers[0].image
 
-                result.append(DeploymentInfo(
-                    name=dep.metadata.name,
-                    namespace=dep.metadata.namespace,
-                    replicas=dep.spec.replicas or 0,
-                    ready_replicas=dep.status.ready_replicas or 0,
-                    available_replicas=dep.status.available_replicas or 0,
-                    image=image,
-                    age=self._calculate_age(dep.metadata.creation_timestamp),
-                    labels=dep.metadata.labels or {}
-                ))
+                result.append(
+                    DeploymentInfo(
+                        name=dep.metadata.name,
+                        namespace=dep.metadata.namespace,
+                        replicas=dep.spec.replicas or 0,
+                        ready_replicas=dep.status.ready_replicas or 0,
+                        available_replicas=dep.status.available_replicas or 0,
+                        image=image,
+                        age=self._calculate_age(dep.metadata.creation_timestamp),
+                        labels=dep.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing deployments: {e}")
@@ -179,27 +198,31 @@ class KubernetesService:
             result = []
             for svc in services.items:
                 ports = []
-                for port in (svc.spec.ports or []):
-                    ports.append({
-                        "port": port.port,
-                        "target_port": str(port.target_port),
-                        "protocol": port.protocol,
-                        "name": port.name
-                    })
+                for port in svc.spec.ports or []:
+                    ports.append(
+                        {
+                            "port": port.port,
+                            "target_port": str(port.target_port),
+                            "protocol": port.protocol,
+                            "name": port.name,
+                        }
+                    )
 
                 external_ips = svc.status.load_balancer.ingress if svc.status.load_balancer else None
                 external_ip = None
                 if external_ips and len(external_ips) > 0:
                     external_ip = external_ips[0].ip or external_ips[0].hostname
 
-                result.append(ServiceInfo(
-                    name=svc.metadata.name,
-                    namespace=svc.metadata.namespace,
-                    type=svc.spec.type,
-                    cluster_ip=svc.spec.cluster_ip,
-                    external_ip=external_ip,
-                    ports=ports
-                ))
+                result.append(
+                    ServiceInfo(
+                        name=svc.metadata.name,
+                        namespace=svc.metadata.namespace,
+                        type=svc.spec.type,
+                        cluster_ip=svc.spec.cluster_ip,
+                        external_ip=external_ip,
+                        ports=ports,
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing services: {e}")
@@ -215,21 +238,23 @@ class KubernetesService:
 
             result = []
             for event in events.items:
-                result.append(K8sEvent(
-                    name=event.metadata.name,
-                    namespace=event.metadata.namespace,
-                    type=event.type or "Normal",
-                    reason=event.reason or "",
-                    message=event.message or "",
-                    count=event.count or 1,
-                    first_timestamp=event.first_timestamp,
-                    last_timestamp=event.last_timestamp,
-                    involved_object={
-                        "kind": event.involved_object.kind,
-                        "name": event.involved_object.name,
-                        "namespace": event.involved_object.namespace or ""
-                    }
-                ))
+                result.append(
+                    K8sEvent(
+                        name=event.metadata.name,
+                        namespace=event.metadata.namespace,
+                        type=event.type or "Normal",
+                        reason=event.reason or "",
+                        message=event.message or "",
+                        count=event.count or 1,
+                        first_timestamp=event.first_timestamp,
+                        last_timestamp=event.last_timestamp,
+                        involved_object={
+                            "kind": event.involved_object.kind,
+                            "name": event.involved_object.name,
+                            "namespace": event.involved_object.namespace or "",
+                        },
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing events: {e}")
@@ -241,28 +266,27 @@ class KubernetesService:
         try:
             # Use field selector to filter events for this specific pod
             field_selector = f"involvedObject.name={pod_name},involvedObject.kind=Pod"
-            events = self._core_v1.list_namespaced_event(
-                namespace,
-                field_selector=field_selector
-            )
+            events = self._core_v1.list_namespaced_event(namespace, field_selector=field_selector)
 
             result = []
             for event in events.items:
-                result.append(K8sEvent(
-                    name=event.metadata.name,
-                    namespace=event.metadata.namespace,
-                    type=event.type or "Normal",
-                    reason=event.reason or "",
-                    message=event.message or "",
-                    count=event.count or 1,
-                    first_timestamp=event.first_timestamp,
-                    last_timestamp=event.last_timestamp,
-                    involved_object={
-                        "kind": event.involved_object.kind,
-                        "name": event.involved_object.name,
-                        "namespace": event.involved_object.namespace or ""
-                    }
-                ))
+                result.append(
+                    K8sEvent(
+                        name=event.metadata.name,
+                        namespace=event.metadata.namespace,
+                        type=event.type or "Normal",
+                        reason=event.reason or "",
+                        message=event.message or "",
+                        count=event.count or 1,
+                        first_timestamp=event.first_timestamp,
+                        last_timestamp=event.last_timestamp,
+                        involved_object={
+                            "kind": event.involved_object.kind,
+                            "name": event.involved_object.name,
+                            "namespace": event.involved_object.namespace or "",
+                        },
+                    )
+                )
             # Sort by last_timestamp descending (most recent first)
             result.sort(key=lambda x: x.last_timestamp or x.first_timestamp or datetime.min, reverse=True)
             return result
@@ -274,17 +298,13 @@ class KubernetesService:
         self._initialize()
         try:
             body = {"spec": {"replicas": replicas}}
-            self._apps_v1.patch_namespaced_deployment_scale(
-                name=deployment_name,
-                namespace=namespace,
-                body=body
-            )
+            self._apps_v1.patch_namespaced_deployment_scale(name=deployment_name, namespace=namespace, body=body)
             return {
                 "success": True,
                 "message": f"Scaled {deployment_name} to {replicas} replicas",
                 "deployment": deployment_name,
                 "namespace": namespace,
-                "replicas": replicas
+                "replicas": replicas,
             }
         except ApiException as e:
             logger.error(f"Error scaling deployment: {e}")
@@ -294,28 +314,14 @@ class KubernetesService:
         self._initialize()
         try:
             now = datetime.now(timezone.utc).isoformat()
-            body = {
-                "spec": {
-                    "template": {
-                        "metadata": {
-                            "annotations": {
-                                "kubectl.kubernetes.io/restartedAt": now
-                            }
-                        }
-                    }
-                }
-            }
-            self._apps_v1.patch_namespaced_deployment(
-                name=deployment_name,
-                namespace=namespace,
-                body=body
-            )
+            body = {"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": now}}}}}
+            self._apps_v1.patch_namespaced_deployment(name=deployment_name, namespace=namespace, body=body)
             return {
                 "success": True,
                 "message": f"Restarted deployment {deployment_name}",
                 "deployment": deployment_name,
                 "namespace": namespace,
-                "timestamp": now
+                "timestamp": now,
             }
         except ApiException as e:
             logger.error(f"Error restarting deployment: {e}")
@@ -353,7 +359,7 @@ class KubernetesService:
                 total_pods=len(pods.items),
                 running_pods=running_pods,
                 namespaces=len(namespaces.items),
-                warnings=warnings
+                warnings=warnings,
             )
         except ApiException as e:
             logger.error(f"Error getting cluster health: {e}")
@@ -371,18 +377,20 @@ class KubernetesService:
                 status = "Unknown"
                 conditions = []
                 for condition in node.status.conditions:
-                    conditions.append(NodeCondition(
-                        type=condition.type,
-                        status=condition.status,
-                        reason=condition.reason,
-                        message=condition.message
-                    ))
+                    conditions.append(
+                        NodeCondition(
+                            type=condition.type,
+                            status=condition.status,
+                            reason=condition.reason,
+                            message=condition.message,
+                        )
+                    )
                     if condition.type == "Ready":
                         status = "Ready" if condition.status == "True" else "NotReady"
 
                 # Extract roles from labels
                 roles = []
-                for label in (node.metadata.labels or {}):
+                for label in node.metadata.labels or {}:
                     if label.startswith("node-role.kubernetes.io/"):
                         roles.append(label.split("/")[-1])
                 if not roles:
@@ -391,7 +399,7 @@ class KubernetesService:
                 # Get IPs
                 internal_ip = None
                 external_ip = None
-                for addr in (node.status.addresses or []):
+                for addr in node.status.addresses or []:
                     if addr.type == "InternalIP":
                         internal_ip = addr.address
                     elif addr.type == "ExternalIP":
@@ -399,40 +407,38 @@ class KubernetesService:
 
                 # Get taints
                 taints = []
-                for taint in (node.spec.taints or []):
-                    taints.append({
-                        "key": taint.key,
-                        "value": taint.value or "",
-                        "effect": taint.effect
-                    })
+                for taint in node.spec.taints or []:
+                    taints.append({"key": taint.key, "value": taint.value or "", "effect": taint.effect})
 
-                result.append(NodeInfo(
-                    name=node.metadata.name,
-                    status=status,
-                    roles=roles,
-                    age=self._calculate_age(node.metadata.creation_timestamp),
-                    version=node.status.node_info.kubelet_version,
-                    os_image=node.status.node_info.os_image,
-                    kernel_version=node.status.node_info.kernel_version,
-                    container_runtime=node.status.node_info.container_runtime_version,
-                    internal_ip=internal_ip,
-                    external_ip=external_ip,
-                    conditions=conditions,
-                    capacity=NodeResources(
-                        cpu=node.status.capacity.get("cpu", "0"),
-                        memory=node.status.capacity.get("memory", "0"),
-                        pods=node.status.capacity.get("pods", "0"),
-                        storage=node.status.capacity.get("ephemeral-storage")
-                    ),
-                    allocatable=NodeResources(
-                        cpu=node.status.allocatable.get("cpu", "0"),
-                        memory=node.status.allocatable.get("memory", "0"),
-                        pods=node.status.allocatable.get("pods", "0"),
-                        storage=node.status.allocatable.get("ephemeral-storage")
-                    ),
-                    labels=node.metadata.labels or {},
-                    taints=taints
-                ))
+                result.append(
+                    NodeInfo(
+                        name=node.metadata.name,
+                        status=status,
+                        roles=roles,
+                        age=self._calculate_age(node.metadata.creation_timestamp),
+                        version=node.status.node_info.kubelet_version,
+                        os_image=node.status.node_info.os_image,
+                        kernel_version=node.status.node_info.kernel_version,
+                        container_runtime=node.status.node_info.container_runtime_version,
+                        internal_ip=internal_ip,
+                        external_ip=external_ip,
+                        conditions=conditions,
+                        capacity=NodeResources(
+                            cpu=node.status.capacity.get("cpu", "0"),
+                            memory=node.status.capacity.get("memory", "0"),
+                            pods=node.status.capacity.get("pods", "0"),
+                            storage=node.status.capacity.get("ephemeral-storage"),
+                        ),
+                        allocatable=NodeResources(
+                            cpu=node.status.allocatable.get("cpu", "0"),
+                            memory=node.status.allocatable.get("memory", "0"),
+                            pods=node.status.allocatable.get("pods", "0"),
+                            storage=node.status.allocatable.get("ephemeral-storage"),
+                        ),
+                        labels=node.metadata.labels or {},
+                        taints=taints,
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing nodes: {e}")
@@ -454,7 +460,7 @@ class KubernetesService:
         tail_lines: int = 100,
         since_seconds: Optional[int] = None,
         timestamps: bool = False,
-        previous: bool = False
+        previous: bool = False,
     ) -> PodLogResponse:
         """Get logs from a pod container."""
         self._initialize()
@@ -470,7 +476,7 @@ class KubernetesService:
                 "container": container,
                 "tail_lines": tail_lines,
                 "timestamps": timestamps,
-                "previous": previous
+                "previous": previous,
             }
             if since_seconds:
                 kwargs["since_seconds"] = since_seconds
@@ -478,14 +484,10 @@ class KubernetesService:
             logs = self._core_v1.read_namespaced_pod_log(**kwargs)
 
             # Check if logs were truncated
-            truncated = len(logs.split('\n')) >= tail_lines
+            truncated = len(logs.split("\n")) >= tail_lines
 
             return PodLogResponse(
-                namespace=namespace,
-                pod_name=pod_name,
-                container=container,
-                logs=logs,
-                truncated=truncated
+                namespace=namespace, pod_name=pod_name, container=container, logs=logs, truncated=truncated
             )
         except ApiException as e:
             logger.error(f"Error getting pod logs: {e}")
@@ -499,16 +501,11 @@ class KubernetesService:
 
             if namespace:
                 metrics = custom_api.list_namespaced_custom_object(
-                    group="metrics.k8s.io",
-                    version="v1beta1",
-                    namespace=namespace,
-                    plural="pods"
+                    group="metrics.k8s.io", version="v1beta1", namespace=namespace, plural="pods"
                 )
             else:
                 metrics = custom_api.list_cluster_custom_object(
-                    group="metrics.k8s.io",
-                    version="v1beta1",
-                    plural="pods"
+                    group="metrics.k8s.io", version="v1beta1", plural="pods"
                 )
 
             result = []
@@ -529,22 +526,26 @@ class KubernetesService:
                     memory_bytes = self._parse_memory(memory)
                     total_memory_bytes += memory_bytes
 
-                    containers.append(ContainerMetrics(
-                        name=container.get("name", "unknown"),
-                        cpu_usage=cpu,
-                        cpu_percent=0,  # Would need limits to calculate
-                        memory_usage=memory,
-                        memory_percent=0
-                    ))
+                    containers.append(
+                        ContainerMetrics(
+                            name=container.get("name", "unknown"),
+                            cpu_usage=cpu,
+                            cpu_percent=0,  # Would need limits to calculate
+                            memory_usage=memory,
+                            memory_percent=0,
+                        )
+                    )
 
-                result.append(PodMetrics(
-                    name=item["metadata"]["name"],
-                    namespace=item["metadata"]["namespace"],
-                    containers=containers,
-                    total_cpu=f"{total_cpu_nano // 1000000}m",
-                    total_memory=self._format_memory(total_memory_bytes),
-                    timestamp=datetime.now(timezone.utc)
-                ))
+                result.append(
+                    PodMetrics(
+                        name=item["metadata"]["name"],
+                        namespace=item["metadata"]["namespace"],
+                        containers=containers,
+                        total_cpu=f"{total_cpu_nano // 1000000}m",
+                        total_memory=self._format_memory(total_memory_bytes),
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                )
 
             return result
         except ApiException as e:
@@ -559,11 +560,7 @@ class KubernetesService:
         self._initialize()
         try:
             custom_api = client.CustomObjectsApi(self._api_client)
-            metrics = custom_api.list_cluster_custom_object(
-                group="metrics.k8s.io",
-                version="v1beta1",
-                plural="nodes"
-            )
+            metrics = custom_api.list_cluster_custom_object(group="metrics.k8s.io", version="v1beta1", plural="nodes")
 
             # Get node capacities
             nodes = self._core_v1.list_node()
@@ -571,7 +568,7 @@ class KubernetesService:
             for node in nodes.items:
                 node_capacity[node.metadata.name] = {
                     "cpu": self._parse_cpu(node.status.capacity.get("cpu", "0")),
-                    "memory": self._parse_memory(node.status.capacity.get("memory", "0"))
+                    "memory": self._parse_memory(node.status.capacity.get("memory", "0")),
                 }
 
             result = []
@@ -587,14 +584,16 @@ class KubernetesService:
                 cpu_percent = (cpu_nano / capacity["cpu"] * 100) if capacity["cpu"] > 0 else 0
                 memory_percent = (memory_bytes / capacity["memory"] * 100) if capacity["memory"] > 0 else 0
 
-                result.append(NodeMetrics(
-                    name=name,
-                    cpu_usage=f"{cpu_nano // 1000000}m",
-                    cpu_percent=round(cpu_percent, 1),
-                    memory_usage=self._format_memory(memory_bytes),
-                    memory_percent=round(memory_percent, 1),
-                    timestamp=datetime.now(timezone.utc)
-                ))
+                result.append(
+                    NodeMetrics(
+                        name=name,
+                        cpu_usage=f"{cpu_nano // 1000000}m",
+                        cpu_percent=round(cpu_percent, 1),
+                        memory_usage=self._format_memory(memory_bytes),
+                        memory_percent=round(memory_percent, 1),
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                )
 
             return result
         except ApiException as e:
@@ -629,9 +628,11 @@ class KubernetesService:
                 cpu_percent=round((total_cpu_usage / total_cpu_capacity * 100) if total_cpu_capacity > 0 else 0, 1),
                 total_memory_capacity=self._format_memory(total_memory_capacity),
                 total_memory_usage=self._format_memory(total_memory_usage),
-                memory_percent=round((total_memory_usage / total_memory_capacity * 100) if total_memory_capacity > 0 else 0, 1),
+                memory_percent=round(
+                    (total_memory_usage / total_memory_capacity * 100) if total_memory_capacity > 0 else 0, 1
+                ),
                 nodes=node_metrics,
-                timestamp=datetime.now(timezone.utc)
+                timestamp=datetime.now(timezone.utc),
             )
         except Exception as e:
             logger.error(f"Error getting cluster metrics: {e}")
@@ -656,11 +657,19 @@ class KubernetesService:
         if not mem_str:
             return 0
         mem_str = str(mem_str)
-        units = {"Ki": 1024, "Mi": 1024**2, "Gi": 1024**3, "Ti": 1024**4,
-                 "K": 1000, "M": 1000**2, "G": 1000**3, "T": 1000**4}
+        units = {
+            "Ki": 1024,
+            "Mi": 1024**2,
+            "Gi": 1024**3,
+            "Ti": 1024**4,
+            "K": 1000,
+            "M": 1000**2,
+            "G": 1000**3,
+            "T": 1000**4,
+        }
         for unit, multiplier in units.items():
             if mem_str.endswith(unit):
-                return int(mem_str[:-len(unit)]) * multiplier
+                return int(mem_str[: -len(unit)]) * multiplier
         return int(mem_str)
 
     def _format_memory(self, bytes_val: int) -> str:
@@ -674,11 +683,7 @@ class KubernetesService:
         return f"{bytes_val}"
 
     async def exec_command(
-        self,
-        namespace: str,
-        pod_name: str,
-        command: List[str],
-        container: Optional[str] = None
+        self, namespace: str, pod_name: str, command: List[str], container: Optional[str] = None
     ) -> PodExecResponse:
         """Execute a command in a pod container."""
         self._initialize()
@@ -700,7 +705,7 @@ class KubernetesService:
                 stdin=False,
                 stdout=True,
                 tty=False,
-                _preload_content=False
+                _preload_content=False,
             )
 
             stdout = ""
@@ -719,7 +724,7 @@ class KubernetesService:
                 command=command,
                 stdout=stdout,
                 stderr=stderr,
-                exit_code=resp.returncode or 0
+                exit_code=resp.returncode or 0,
             )
         except ApiException as e:
             logger.error(f"Error executing command: {e}")
@@ -738,20 +743,26 @@ class KubernetesService:
             for ing in ingresses.items:
                 hosts = []
                 rules = []
-                for rule in (ing.spec.rules or []):
+                for rule in ing.spec.rules or []:
                     if rule.host:
                         hosts.append(rule.host)
                     paths = []
                     if rule.http:
-                        for path in (rule.http.paths or []):
-                            paths.append({
-                                "path": path.path,
-                                "path_type": path.path_type,
-                                "backend": {
-                                    "service": path.backend.service.name if path.backend.service else None,
-                                    "port": path.backend.service.port.number if path.backend.service and path.backend.service.port else None
+                        for path in rule.http.paths or []:
+                            paths.append(
+                                {
+                                    "path": path.path,
+                                    "path_type": path.path_type,
+                                    "backend": {
+                                        "service": path.backend.service.name if path.backend.service else None,
+                                        "port": (
+                                            path.backend.service.port.number
+                                            if path.backend.service and path.backend.service.port
+                                            else None
+                                        ),
+                                    },
                                 }
-                            })
+                            )
                     rules.append(IngressRule(host=rule.host, paths=paths))
 
                 address = None
@@ -759,18 +770,20 @@ class KubernetesService:
                     lb = ing.status.load_balancer.ingress[0]
                     address = lb.ip or lb.hostname
 
-                result.append(IngressInfo(
-                    name=ing.metadata.name,
-                    namespace=ing.metadata.namespace,
-                    class_name=ing.spec.ingress_class_name,
-                    hosts=hosts,
-                    address=address,
-                    rules=rules,
-                    tls=[{"hosts": t.hosts, "secret": t.secret_name} for t in (ing.spec.tls or [])],
-                    age=self._calculate_age(ing.metadata.creation_timestamp),
-                    labels=ing.metadata.labels or {},
-                    annotations=ing.metadata.annotations or {}
-                ))
+                result.append(
+                    IngressInfo(
+                        name=ing.metadata.name,
+                        namespace=ing.metadata.namespace,
+                        class_name=ing.spec.ingress_class_name,
+                        hosts=hosts,
+                        address=address,
+                        rules=rules,
+                        tls=[{"hosts": t.hosts, "secret": t.secret_name} for t in (ing.spec.tls or [])],
+                        age=self._calculate_age(ing.metadata.creation_timestamp),
+                        labels=ing.metadata.labels or {},
+                        annotations=ing.metadata.annotations or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing ingresses: {e}")
@@ -788,14 +801,16 @@ class KubernetesService:
             result = []
             for cm in configmaps.items:
                 data_keys = list((cm.data or {}).keys()) + list((cm.binary_data or {}).keys())
-                result.append(ConfigMapInfo(
-                    name=cm.metadata.name,
-                    namespace=cm.metadata.namespace,
-                    data_keys=data_keys,
-                    data_count=len(data_keys),
-                    age=self._calculate_age(cm.metadata.creation_timestamp),
-                    labels=cm.metadata.labels or {}
-                ))
+                result.append(
+                    ConfigMapInfo(
+                        name=cm.metadata.name,
+                        namespace=cm.metadata.namespace,
+                        data_keys=data_keys,
+                        data_count=len(data_keys),
+                        age=self._calculate_age(cm.metadata.creation_timestamp),
+                        labels=cm.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing configmaps: {e}")
@@ -813,15 +828,17 @@ class KubernetesService:
             result = []
             for secret in secrets.items:
                 data_keys = list((secret.data or {}).keys())
-                result.append(SecretInfo(
-                    name=secret.metadata.name,
-                    namespace=secret.metadata.namespace,
-                    type=secret.type,
-                    data_keys=data_keys,
-                    data_count=len(data_keys),
-                    age=self._calculate_age(secret.metadata.creation_timestamp),
-                    labels=secret.metadata.labels or {}
-                ))
+                result.append(
+                    SecretInfo(
+                        name=secret.metadata.name,
+                        namespace=secret.metadata.namespace,
+                        type=secret.type,
+                        data_keys=data_keys,
+                        data_count=len(data_keys),
+                        age=self._calculate_age(secret.metadata.creation_timestamp),
+                        labels=secret.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing secrets: {e}")
@@ -842,17 +859,19 @@ class KubernetesService:
                 if pvc.status.capacity:
                     capacity = pvc.status.capacity.get("storage")
 
-                result.append(PVCInfo(
-                    name=pvc.metadata.name,
-                    namespace=pvc.metadata.namespace,
-                    status=pvc.status.phase,
-                    volume=pvc.spec.volume_name,
-                    capacity=capacity,
-                    access_modes=pvc.spec.access_modes or [],
-                    storage_class=pvc.spec.storage_class_name,
-                    age=self._calculate_age(pvc.metadata.creation_timestamp),
-                    labels=pvc.metadata.labels or {}
-                ))
+                result.append(
+                    PVCInfo(
+                        name=pvc.metadata.name,
+                        namespace=pvc.metadata.namespace,
+                        status=pvc.status.phase,
+                        volume=pvc.spec.volume_name,
+                        capacity=capacity,
+                        access_modes=pvc.spec.access_modes or [],
+                        storage_class=pvc.spec.storage_class_name,
+                        age=self._calculate_age(pvc.metadata.creation_timestamp),
+                        labels=pvc.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing PVCs: {e}")
@@ -873,17 +892,19 @@ class KubernetesService:
                 if sts.spec.template.spec.containers:
                     image = sts.spec.template.spec.containers[0].image
 
-                result.append(StatefulSetInfo(
-                    name=sts.metadata.name,
-                    namespace=sts.metadata.namespace,
-                    replicas=sts.spec.replicas or 0,
-                    ready_replicas=sts.status.ready_replicas or 0,
-                    current_replicas=sts.status.current_replicas or 0,
-                    image=image,
-                    service_name=sts.spec.service_name,
-                    age=self._calculate_age(sts.metadata.creation_timestamp),
-                    labels=sts.metadata.labels or {}
-                ))
+                result.append(
+                    StatefulSetInfo(
+                        name=sts.metadata.name,
+                        namespace=sts.metadata.namespace,
+                        replicas=sts.spec.replicas or 0,
+                        ready_replicas=sts.status.ready_replicas or 0,
+                        current_replicas=sts.status.current_replicas or 0,
+                        image=image,
+                        service_name=sts.spec.service_name,
+                        age=self._calculate_age(sts.metadata.creation_timestamp),
+                        labels=sts.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing statefulsets: {e}")
@@ -904,18 +925,20 @@ class KubernetesService:
                 if ds.spec.template.spec.containers:
                     image = ds.spec.template.spec.containers[0].image
 
-                result.append(DaemonSetInfo(
-                    name=ds.metadata.name,
-                    namespace=ds.metadata.namespace,
-                    desired=ds.status.desired_number_scheduled or 0,
-                    current=ds.status.current_number_scheduled or 0,
-                    ready=ds.status.number_ready or 0,
-                    available=ds.status.number_available or 0,
-                    node_selector=ds.spec.template.spec.node_selector or {},
-                    image=image,
-                    age=self._calculate_age(ds.metadata.creation_timestamp),
-                    labels=ds.metadata.labels or {}
-                ))
+                result.append(
+                    DaemonSetInfo(
+                        name=ds.metadata.name,
+                        namespace=ds.metadata.namespace,
+                        desired=ds.status.desired_number_scheduled or 0,
+                        current=ds.status.current_number_scheduled or 0,
+                        ready=ds.status.number_ready or 0,
+                        available=ds.status.number_available or 0,
+                        node_selector=ds.spec.template.spec.node_selector or {},
+                        image=image,
+                        age=self._calculate_age(ds.metadata.creation_timestamp),
+                        labels=ds.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing daemonsets: {e}")
@@ -937,17 +960,19 @@ class KubernetesService:
                     delta = job.status.completion_time - job.status.start_time
                     duration = f"{int(delta.total_seconds())}s"
 
-                result.append(JobInfo(
-                    name=job.metadata.name,
-                    namespace=job.metadata.namespace,
-                    completions=job.spec.completions,
-                    succeeded=job.status.succeeded or 0,
-                    failed=job.status.failed or 0,
-                    active=job.status.active or 0,
-                    duration=duration,
-                    age=self._calculate_age(job.metadata.creation_timestamp),
-                    labels=job.metadata.labels or {}
-                ))
+                result.append(
+                    JobInfo(
+                        name=job.metadata.name,
+                        namespace=job.metadata.namespace,
+                        completions=job.spec.completions,
+                        succeeded=job.status.succeeded or 0,
+                        failed=job.status.failed or 0,
+                        active=job.status.active or 0,
+                        duration=duration,
+                        age=self._calculate_age(job.metadata.creation_timestamp),
+                        labels=job.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing jobs: {e}")
@@ -964,16 +989,18 @@ class KubernetesService:
 
             result = []
             for cj in cronjobs.items:
-                result.append(CronJobInfo(
-                    name=cj.metadata.name,
-                    namespace=cj.metadata.namespace,
-                    schedule=cj.spec.schedule,
-                    suspend=cj.spec.suspend or False,
-                    active=len(cj.status.active or []),
-                    last_schedule=cj.status.last_schedule_time,
-                    age=self._calculate_age(cj.metadata.creation_timestamp),
-                    labels=cj.metadata.labels or {}
-                ))
+                result.append(
+                    CronJobInfo(
+                        name=cj.metadata.name,
+                        namespace=cj.metadata.namespace,
+                        schedule=cj.spec.schedule,
+                        suspend=cj.spec.suspend or False,
+                        active=len(cj.status.active or []),
+                        last_schedule=cj.status.last_schedule_time,
+                        age=self._calculate_age(cj.metadata.creation_timestamp),
+                        labels=cj.metadata.labels or {},
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing cronjobs: {e}")
@@ -997,27 +1024,26 @@ class KubernetesService:
                 if hpa.status.current_cpu_utilization_percentage:
                     current_cpu = f"{hpa.status.current_cpu_utilization_percentage}%"
 
-                result.append(HPAInfo(
-                    name=hpa.metadata.name,
-                    namespace=hpa.metadata.namespace,
-                    reference=f"{hpa.spec.scale_target_ref.kind}/{hpa.spec.scale_target_ref.name}",
-                    min_replicas=hpa.spec.min_replicas or 1,
-                    max_replicas=hpa.spec.max_replicas,
-                    current_replicas=hpa.status.current_replicas or 0,
-                    target_cpu=target_cpu,
-                    current_cpu=current_cpu,
-                    age=self._calculate_age(hpa.metadata.creation_timestamp)
-                ))
+                result.append(
+                    HPAInfo(
+                        name=hpa.metadata.name,
+                        namespace=hpa.metadata.namespace,
+                        reference=f"{hpa.spec.scale_target_ref.kind}/{hpa.spec.scale_target_ref.name}",
+                        min_replicas=hpa.spec.min_replicas or 1,
+                        max_replicas=hpa.spec.max_replicas,
+                        current_replicas=hpa.status.current_replicas or 0,
+                        target_cpu=target_cpu,
+                        current_cpu=current_cpu,
+                        age=self._calculate_age(hpa.metadata.creation_timestamp),
+                    )
+                )
             return result
         except ApiException as e:
             logger.error(f"Error listing HPAs: {e}")
             raise
 
     async def apply_yaml(
-        self,
-        yaml_content: str,
-        namespace: Optional[str] = None,
-        dry_run: bool = False
+        self, yaml_content: str, namespace: Optional[str] = None, dry_run: bool = False
     ) -> YAMLApplyResponse:
         """Apply YAML manifest(s) to the cluster."""
         import yaml
@@ -1038,7 +1064,7 @@ class KubernetesService:
                     message="No valid YAML documents found",
                     resources=[],
                     errors=["Empty or invalid YAML content"],
-                    dry_run=dry_run
+                    dry_run=dry_run,
                 )
 
             for doc in documents:
@@ -1060,37 +1086,43 @@ class KubernetesService:
                     # Use kubernetes utils to create from dict
                     if dry_run:
                         # For dry run, just validate the structure
-                        applied_resources.append(AppliedResourceInfo(
-                            kind=kind,
-                            name=name,
-                            namespace=doc_namespace,
-                            action="validated",
-                            message="Dry run - resource would be applied"
-                        ))
+                        applied_resources.append(
+                            AppliedResourceInfo(
+                                kind=kind,
+                                name=name,
+                                namespace=doc_namespace,
+                                action="validated",
+                                message="Dry run - resource would be applied",
+                            )
+                        )
                     else:
                         # Apply the resource using dynamic client
                         try:
                             utils.create_from_dict(self._api_client, doc, namespace=doc_namespace)
-                            applied_resources.append(AppliedResourceInfo(
-                                kind=kind,
-                                name=name,
-                                namespace=doc_namespace,
-                                action="created",
-                                message=f"{kind}/{name} created successfully"
-                            ))
+                            applied_resources.append(
+                                AppliedResourceInfo(
+                                    kind=kind,
+                                    name=name,
+                                    namespace=doc_namespace,
+                                    action="created",
+                                    message=f"{kind}/{name} created successfully",
+                                )
+                            )
                         except ApiException as e:
                             if e.status == 409:  # Already exists, try to patch
                                 try:
                                     # Get the appropriate API for this resource
                                     api_version = doc.get("apiVersion", "v1")
                                     self._patch_resource(doc, doc_namespace)
-                                    applied_resources.append(AppliedResourceInfo(
-                                        kind=kind,
-                                        name=name,
-                                        namespace=doc_namespace,
-                                        action="configured",
-                                        message=f"{kind}/{name} configured successfully"
-                                    ))
+                                    applied_resources.append(
+                                        AppliedResourceInfo(
+                                            kind=kind,
+                                            name=name,
+                                            namespace=doc_namespace,
+                                            action="configured",
+                                            message=f"{kind}/{name} configured successfully",
+                                        )
+                                    )
                                 except Exception as patch_error:
                                     errors.append(f"{kind}/{name}: Failed to update - {str(patch_error)}")
                             else:
@@ -1106,11 +1138,7 @@ class KubernetesService:
                 message = f"Applied {len(applied_resources)} resource(s) with {len(errors)} error(s)"
 
             return YAMLApplyResponse(
-                success=success,
-                message=message,
-                resources=applied_resources,
-                errors=errors,
-                dry_run=dry_run
+                success=success, message=message, resources=applied_resources, errors=errors, dry_run=dry_run
             )
 
         except yaml.YAMLError as e:
@@ -1119,7 +1147,7 @@ class KubernetesService:
                 message="Failed to parse YAML",
                 resources=[],
                 errors=[f"YAML parse error: {str(e)}"],
-                dry_run=dry_run
+                dry_run=dry_run,
             )
         except Exception as e:
             logger.error(f"Error applying YAML: {e}")
@@ -1128,7 +1156,7 @@ class KubernetesService:
                 message="Failed to apply YAML manifest",
                 resources=applied_resources,
                 errors=[str(e)],
-                dry_run=dry_run
+                dry_run=dry_run,
             )
 
     def _patch_resource(self, doc: Dict[str, Any], namespace: Optional[str] = None):
@@ -1167,36 +1195,32 @@ class KubernetesService:
         else:
             raise Exception(f"Unsupported resource type for patching: {kind}")
 
-    async def execute_kubectl(
-        self,
-        command: str,
-        timeout: int = 30
-    ) -> KubectlResponse:
+    async def execute_kubectl(self, command: str, timeout: int = 30) -> KubectlResponse:
         """Execute a kubectl command and return the result."""
-        import subprocess
         import shlex
+        import subprocess
         import time
 
         start_time = time.time()
 
         # Security: Block dangerous commands
         dangerous_patterns = [
-            'delete --all',
-            'delete namespace',
-            'delete ns',
-            '--force --grace-period=0',
-            'drain',
-            'cordon',
-            'uncordon',
-            'taint',
-            'cluster-info dump',
-            'proxy',
-            'port-forward',
-            'attach',
-            'cp ',  # file copy
-            'auth can-i',
-            'certificate',
-            'token',
+            "delete --all",
+            "delete namespace",
+            "delete ns",
+            "--force --grace-period=0",
+            "drain",
+            "cordon",
+            "uncordon",
+            "taint",
+            "cluster-info dump",
+            "proxy",
+            "port-forward",
+            "attach",
+            "cp ",  # file copy
+            "auth can-i",
+            "certificate",
+            "token",
         ]
 
         command_lower = command.lower()
@@ -1208,7 +1232,7 @@ class KubernetesService:
                     stdout="",
                     stderr=f"Command blocked: '{pattern}' is not allowed for security reasons",
                     exit_code=1,
-                    execution_time=0.0
+                    execution_time=0.0,
                 )
 
         # Build the full kubectl command
@@ -1230,17 +1254,12 @@ class KubernetesService:
                 stdout="",
                 stderr=f"Invalid command syntax: {str(e)}",
                 exit_code=1,
-                execution_time=0.0
+                execution_time=0.0,
             )
 
         try:
             # Execute the command
-            result = subprocess.run(
-                kubectl_cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
+            result = subprocess.run(kubectl_cmd, capture_output=True, text=True, timeout=timeout)
 
             execution_time = time.time() - start_time
 
@@ -1250,7 +1269,7 @@ class KubernetesService:
                 stdout=result.stdout,
                 stderr=result.stderr,
                 exit_code=result.returncode,
-                execution_time=round(execution_time, 3)
+                execution_time=round(execution_time, 3),
             )
 
         except subprocess.TimeoutExpired:
@@ -1261,7 +1280,7 @@ class KubernetesService:
                 stdout="",
                 stderr=f"Command timed out after {timeout} seconds",
                 exit_code=124,
-                execution_time=round(execution_time, 3)
+                execution_time=round(execution_time, 3),
             )
         except FileNotFoundError:
             return KubectlResponse(
@@ -1270,7 +1289,7 @@ class KubernetesService:
                 stdout="",
                 stderr="kubectl not found. Please ensure kubectl is installed and in PATH",
                 exit_code=127,
-                execution_time=0.0
+                execution_time=0.0,
             )
         except Exception as e:
             execution_time = time.time() - start_time
@@ -1281,14 +1300,11 @@ class KubernetesService:
                 stdout="",
                 stderr=str(e),
                 exit_code=1,
-                execution_time=round(execution_time, 3)
+                execution_time=round(execution_time, 3),
             )
 
     async def execute_shell(
-        self,
-        command: str,
-        timeout: int = 30,
-        working_directory: Optional[str] = None
+        self, command: str, timeout: int = 30, working_directory: Optional[str] = None
     ) -> ShellResponse:
         """Execute a shell command and return the result."""
         import subprocess
@@ -1304,24 +1320,24 @@ class KubernetesService:
 
         # Security: Block extremely dangerous commands
         dangerous_patterns = [
-            'rm -rf /',
-            'rm -rf /*',
-            'mkfs',
-            'dd if=',
-            ':(){ :|:& };:',  # fork bomb
-            'chmod -R 777 /',
-            'chown -R',
-            '> /dev/sda',
-            'mv /* ',
-            'wget .* \\| sh',
-            'curl .* \\| sh',
-            'sudo su',
-            'sudo -i',
-            'passwd',
-            'useradd',
-            'userdel',
-            'groupadd',
-            'groupdel',
+            "rm -rf /",
+            "rm -rf /*",
+            "mkfs",
+            "dd if=",
+            ":(){ :|:& };:",  # fork bomb
+            "chmod -R 777 /",
+            "chown -R",
+            "> /dev/sda",
+            "mv /* ",
+            "wget .* \\| sh",
+            "curl .* \\| sh",
+            "sudo su",
+            "sudo -i",
+            "passwd",
+            "useradd",
+            "userdel",
+            "groupadd",
+            "groupdel",
         ]
 
         command_lower = command.lower()
@@ -1334,7 +1350,7 @@ class KubernetesService:
                     stderr=f"Command blocked: This command pattern is not allowed for security reasons",
                     exit_code=1,
                     execution_time=0.0,
-                    working_directory=cwd
+                    working_directory=cwd,
                 )
 
         try:
@@ -1346,7 +1362,7 @@ class KubernetesService:
                 text=True,
                 timeout=timeout,
                 cwd=cwd,
-                env={**os.environ, "HOME": os.path.expanduser("~")}
+                env={**os.environ, "HOME": os.path.expanduser("~")},
             )
 
             execution_time = time.time() - start_time
@@ -1358,7 +1374,7 @@ class KubernetesService:
                 stderr=result.stderr,
                 exit_code=result.returncode,
                 execution_time=round(execution_time, 3),
-                working_directory=cwd
+                working_directory=cwd,
             )
 
         except subprocess.TimeoutExpired:
@@ -1370,7 +1386,7 @@ class KubernetesService:
                 stderr=f"Command timed out after {timeout} seconds",
                 exit_code=124,
                 execution_time=round(execution_time, 3),
-                working_directory=cwd
+                working_directory=cwd,
             )
         except Exception as e:
             execution_time = time.time() - start_time
@@ -1382,7 +1398,7 @@ class KubernetesService:
                 stderr=str(e),
                 exit_code=1,
                 execution_time=round(execution_time, 3),
-                working_directory=cwd
+                working_directory=cwd,
             )
 
     async def stream_pod_logs(
@@ -1392,7 +1408,7 @@ class KubernetesService:
         container: str,
         tail_lines: int = 100,
         timestamps: bool = False,
-        follow: bool = True
+        follow: bool = True,
     ):
         """
         Stream logs from a pod container as an async generator.
@@ -1412,15 +1428,15 @@ class KubernetesService:
                 "tail_lines": tail_lines,
                 "timestamps": timestamps,
                 "follow": follow,
-                "_preload_content": False
+                "_preload_content": False,
             }
 
             response = self._core_v1.read_namespaced_pod_log(**kwargs)
 
             for line in response.stream():
                 if isinstance(line, bytes):
-                    line = line.decode('utf-8')
-                line = line.rstrip('\n')
+                    line = line.decode("utf-8")
+                line = line.rstrip("\n")
                 if line:
                     yield line
                 await asyncio.sleep(0.01)
@@ -1460,10 +1476,7 @@ class KubernetesService:
             for rs in replica_sets.items:
                 # Check if this RS belongs to our deployment
                 owner_refs = rs.metadata.owner_references or []
-                is_owned = any(
-                    ref.kind == "Deployment" and ref.uid == deployment_uid
-                    for ref in owner_refs
-                )
+                is_owned = any(ref.kind == "Deployment" and ref.uid == deployment_uid for ref in owner_refs)
 
                 if is_owned:
                     annotations = rs.metadata.annotations or {}
@@ -1477,16 +1490,20 @@ class KubernetesService:
                     # Get change cause annotation
                     change_cause = annotations.get("kubernetes.io/change-cause", "")
 
-                    revisions.append({
-                        "revision": int(revision),
-                        "name": rs.metadata.name,
-                        "replicas": rs.status.replicas or 0,
-                        "ready_replicas": rs.status.ready_replicas or 0,
-                        "image": image,
-                        "change_cause": change_cause,
-                        "created_at": rs.metadata.creation_timestamp.isoformat() if rs.metadata.creation_timestamp else None,
-                        "age": self._calculate_age(rs.metadata.creation_timestamp)
-                    })
+                    revisions.append(
+                        {
+                            "revision": int(revision),
+                            "name": rs.metadata.name,
+                            "replicas": rs.status.replicas or 0,
+                            "ready_replicas": rs.status.ready_replicas or 0,
+                            "image": image,
+                            "change_cause": change_cause,
+                            "created_at": (
+                                rs.metadata.creation_timestamp.isoformat() if rs.metadata.creation_timestamp else None
+                            ),
+                            "age": self._calculate_age(rs.metadata.creation_timestamp),
+                        }
+                    )
 
             # Sort by revision number descending
             revisions.sort(key=lambda x: x["revision"], reverse=True)
@@ -1497,10 +1514,7 @@ class KubernetesService:
             raise
 
     async def rollback_deployment_to_revision(
-        self,
-        namespace: str,
-        deployment_name: str,
-        revision: int
+        self, namespace: str, deployment_name: str, revision: int
     ) -> Dict[str, Any]:
         """Rollback a deployment to a specific revision using kubectl."""
         import subprocess
@@ -1517,20 +1531,12 @@ class KubernetesService:
                 config_path = os.path.expanduser(settings.K8S_CONFIG_PATH)
                 kubectl_cmd.extend(["--kubeconfig", config_path])
 
-            kubectl_cmd.extend([
-                "rollout", "undo",
-                f"deployment/{deployment_name}",
-                f"--to-revision={revision}",
-                "-n", namespace
-            ])
+            kubectl_cmd.extend(
+                ["rollout", "undo", f"deployment/{deployment_name}", f"--to-revision={revision}", "-n", namespace]
+            )
 
             # Execute the rollback
-            result = subprocess.run(
-                kubectl_cmd,
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
+            result = subprocess.run(kubectl_cmd, capture_output=True, text=True, timeout=60)
 
             execution_time = time.time() - start_time
 
@@ -1542,7 +1548,7 @@ class KubernetesService:
                     "namespace": namespace,
                     "target_revision": revision,
                     "output": result.stdout.strip(),
-                    "execution_time": round(execution_time, 3)
+                    "execution_time": round(execution_time, 3),
                 }
             else:
                 return {
@@ -1552,7 +1558,7 @@ class KubernetesService:
                     "namespace": namespace,
                     "target_revision": revision,
                     "error": result.stderr.strip(),
-                    "execution_time": round(execution_time, 3)
+                    "execution_time": round(execution_time, 3),
                 }
 
         except subprocess.TimeoutExpired:
@@ -1562,7 +1568,7 @@ class KubernetesService:
                 "deployment": deployment_name,
                 "namespace": namespace,
                 "target_revision": revision,
-                "error": "Command timed out after 60 seconds"
+                "error": "Command timed out after 60 seconds",
             }
         except Exception as e:
             logger.error(f"Error rolling back deployment: {e}")
@@ -1572,7 +1578,7 @@ class KubernetesService:
                 "deployment": deployment_name,
                 "namespace": namespace,
                 "target_revision": revision,
-                "error": str(e)
+                "error": str(e),
             }
 
 

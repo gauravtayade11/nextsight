@@ -1,12 +1,17 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
 
-from app.services.timeline_service import timeline_service
+from fastapi import APIRouter, HTTPException, Query
+
 from app.schemas.timeline import (
-    TimelineEventCreate, TimelineEventResponse,
-    TimelineFilter, TimelineCorrelation, ChangeType, ChangeSource
+    ChangeSource,
+    ChangeType,
+    TimelineCorrelation,
+    TimelineEventCreate,
+    TimelineEventResponse,
+    TimelineFilter,
 )
+from app.services.timeline_service import timeline_service
 
 router = APIRouter()
 
@@ -21,7 +26,7 @@ async def list_events(
     services: Optional[List[str]] = Query(None),
     environments: Optional[List[str]] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0)
+    offset: int = Query(0, ge=0),
 ):
     """List timeline events with filters."""
     filter_params = TimelineFilter(
@@ -33,7 +38,7 @@ async def list_events(
         services=services,
         environments=environments,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
     return await timeline_service.get_events(filter_params)
@@ -74,12 +79,12 @@ async def correlate_incident_events(
     incident_id: str,
     incident_timestamp: datetime = Query(...),
     window_before: int = Query(60, ge=5, le=180),
-    window_after: int = Query(30, ge=5, le=60)
+    window_after: int = Query(30, ge=5, le=60),
 ):
     """Get correlated timeline events for an incident."""
     return await timeline_service.get_events_for_incident(
         incident_id=incident_id,
         incident_timestamp=incident_timestamp,
         window_before_minutes=window_before,
-        window_after_minutes=window_after
+        window_after_minutes=window_after,
     )

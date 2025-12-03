@@ -1,10 +1,11 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import jwt, JWTError
-from passlib.context import CryptContext
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import logging
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 from app.core.config import settings
 
@@ -78,15 +79,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
 
     return user
 
 
-async def get_current_active_user(current_user = Depends(get_current_user)):
+async def get_current_active_user(current_user=Depends(get_current_user)):
     """Dependency to ensure the current user is active."""
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
@@ -95,14 +93,14 @@ async def get_current_active_user(current_user = Depends(get_current_user)):
 
 def require_permission(permission: str):
     """Dependency factory to require a specific permission."""
-    async def permission_checker(current_user = Depends(get_current_user)):
+
+    async def permission_checker(current_user=Depends(get_current_user)):
         from app.schemas.auth import has_permission
+
         if not has_permission(current_user.role, permission):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {permission}"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Permission denied: {permission}")
         return current_user
+
     return permission_checker
 
 
@@ -117,14 +115,12 @@ def require_role(role: str):
         UserRole.ADMIN: 4,
     }
 
-    async def role_checker(current_user = Depends(get_current_user)):
+    async def role_checker(current_user=Depends(get_current_user)):
         required_level = role_hierarchy.get(UserRole(role), 0)
         user_level = role_hierarchy.get(current_user.role, 0)
 
         if user_level < required_level:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient role: requires {role}"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Insufficient role: requires {role}")
         return current_user
+
     return role_checker

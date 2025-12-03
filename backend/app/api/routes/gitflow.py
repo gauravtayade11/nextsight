@@ -1,11 +1,18 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
+from typing import List, Optional
 
-from app.services.gitflow_service import gitflow_service
+from fastapi import APIRouter, HTTPException, Query
+
 from app.schemas.gitflow import (
-    GitFlowBranch, BranchType, ReleaseCandidate, ReleaseStatus,
-    CreateReleaseRequest, ReleaseHistory, GitFlowConfig, PromoteRequest
+    BranchType,
+    CreateReleaseRequest,
+    GitFlowBranch,
+    GitFlowConfig,
+    PromoteRequest,
+    ReleaseCandidate,
+    ReleaseHistory,
+    ReleaseStatus,
 )
+from app.services.gitflow_service import gitflow_service
 
 router = APIRouter()
 
@@ -43,7 +50,7 @@ async def create_release(request: CreateReleaseRequest):
             version=request.version,
             source_branch=request.source_branch,
             changelog=request.changelog,
-            auto_create_branch=request.auto_create_branch
+            auto_create_branch=request.auto_create_branch,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -52,10 +59,7 @@ async def create_release(request: CreateReleaseRequest):
 
 
 @router.get("/releases", response_model=ReleaseHistory)
-async def list_releases(
-    status: Optional[ReleaseStatus] = Query(None),
-    limit: int = Query(20, ge=1, le=100)
-):
+async def list_releases(status: Optional[ReleaseStatus] = Query(None), limit: int = Query(20, ge=1, le=100)):
     """List all releases."""
     return await gitflow_service.get_releases(status, limit)
 
@@ -91,8 +95,7 @@ async def finish_release(release_id: str):
 
 @router.post("/hotfix", response_model=ReleaseCandidate)
 async def create_hotfix(
-    version: str = Query(..., pattern=r"^\d+\.\d+\.\d+(-hotfix\.\d+)?$"),
-    description: str = Query(..., min_length=10)
+    version: str = Query(..., pattern=r"^\d+\.\d+\.\d+(-hotfix\.\d+)?$"), description: str = Query(..., min_length=10)
 ):
     """Create a hotfix branch from main."""
     try:
@@ -131,5 +134,5 @@ async def promote_release(request: PromoteRequest):
         "to_environment": request.to_environment.value,
         "approval_required": request.approval_required,
         "status": "pending_approval" if request.approval_required else "ready",
-        "message": f"Release {release.version} ready for promotion"
+        "message": f"Release {release.version} ready for promotion",
     }

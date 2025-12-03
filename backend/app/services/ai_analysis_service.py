@@ -1,7 +1,8 @@
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone, timedelta
 import json
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
 import google.generativeai as genai
 
 from app.core.config import settings
@@ -35,47 +36,57 @@ class AIAnalysisService:
         k8s_context: Optional[Dict[str, Any]] = None,
         jenkins_context: Optional[Dict[str, Any]] = None,
         timeline_events: Optional[List[Dict[str, Any]]] = None,
-        additional_context: Optional[str] = None
+        additional_context: Optional[str] = None,
     ) -> IncidentAnalysisResponse:
         self._initialize()
 
         context_parts = []
 
-        context_parts.append(f"""
+        context_parts.append(
+            f"""
 ## Incident Details
 - **ID**: {incident_id}
 - **Title**: {incident_title}
 - **Severity**: {severity}
 - **Description**: {incident_description or 'No description provided'}
-""")
+"""
+        )
 
         if k8s_context:
-            context_parts.append(f"""
+            context_parts.append(
+                f"""
 ## Kubernetes Context
 - **Namespace**: {k8s_context.get('namespace', 'N/A')}
 - **Affected Pods**: {json.dumps(k8s_context.get('pods', []), indent=2)}
 - **Recent Events**: {json.dumps(k8s_context.get('events', [])[:10], indent=2)}
 - **Deployment Status**: {json.dumps(k8s_context.get('deployments', []), indent=2)}
-""")
+"""
+            )
 
         if jenkins_context:
-            context_parts.append(f"""
+            context_parts.append(
+                f"""
 ## Jenkins Context
 - **Recent Builds**: {json.dumps(jenkins_context.get('recent_builds', []), indent=2)}
 - **Failed Jobs**: {json.dumps(jenkins_context.get('failed_jobs', []), indent=2)}
-""")
+"""
+            )
 
         if timeline_events:
-            context_parts.append(f"""
+            context_parts.append(
+                f"""
 ## Recent Timeline Events (Last 24 hours)
 {json.dumps(timeline_events[:20], indent=2)}
-""")
+"""
+            )
 
         if additional_context:
-            context_parts.append(f"""
+            context_parts.append(
+                f"""
 ## Additional Context
 {additional_context}
-""")
+"""
+            )
 
         full_context = "\n".join(context_parts)
 
@@ -124,7 +135,7 @@ Provide your analysis in the following JSON format. Return ONLY valid JSON, no m
                     "root_cause_hypothesis": None,
                     "recommendations": [],
                     "related_events": [],
-                    "confidence_score": 0.5
+                    "confidence_score": 0.5,
                 }
 
             return IncidentAnalysisResponse(
@@ -133,7 +144,7 @@ Provide your analysis in the following JSON format. Return ONLY valid JSON, no m
                 root_cause_hypothesis=analysis_data.get("root_cause_hypothesis"),
                 recommendations=analysis_data.get("recommendations", []),
                 related_events=analysis_data.get("related_events", []),
-                confidence_score=analysis_data.get("confidence_score", 0.5)
+                confidence_score=analysis_data.get("confidence_score", 0.5),
             )
 
         except Exception as e:
@@ -144,14 +155,11 @@ Provide your analysis in the following JSON format. Return ONLY valid JSON, no m
                 root_cause_hypothesis=None,
                 recommendations=["Manual investigation required"],
                 related_events=[],
-                confidence_score=0.0
+                confidence_score=0.0,
             )
 
     async def suggest_runbook(
-        self,
-        incident_type: str,
-        symptoms: List[str],
-        affected_services: List[str]
+        self, incident_type: str, symptoms: List[str], affected_services: List[str]
     ) -> Dict[str, Any]:
         self._initialize()
 
@@ -192,10 +200,7 @@ Provide a step-by-step runbook in JSON format. Return ONLY valid JSON, no markdo
             return {"error": str(e)}
 
     async def correlate_events(
-        self,
-        incident_timestamp: datetime,
-        events: List[Dict[str, Any]],
-        window_minutes: int = 30
+        self, incident_timestamp: datetime, events: List[Dict[str, Any]], window_minutes: int = 30
     ) -> Dict[str, Any]:
         self._initialize()
 
@@ -212,11 +217,7 @@ Provide a step-by-step runbook in JSON format. Return ONLY valid JSON, no markdo
                 continue
 
         if not relevant_events:
-            return {
-                "correlations": [],
-                "potential_triggers": [],
-                "confidence": 0.0
-            }
+            return {"correlations": [], "potential_triggers": [], "confidence": 0.0}
 
         prompt = f"""Analyze these events that occurred around an incident at {incident_timestamp.isoformat()}:
 

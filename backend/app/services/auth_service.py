@@ -1,14 +1,11 @@
-from typing import Optional, List, Dict
-from datetime import datetime, timedelta, timezone
-import uuid
 import logging
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
 
 from app.core.config import settings
-from app.core.security import verify_password, get_password_hash, create_access_token
-from app.schemas.auth import (
-    UserInfo, UserCreate, UserRole, TokenResponse,
-    AuditLogEntry
-)
+from app.core.security import create_access_token, get_password_hash, verify_password
+from app.schemas.auth import AuditLogEntry, TokenResponse, UserCreate, UserInfo, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -112,14 +109,14 @@ class AuthService:
             username=username,
             action="login",
             resource_type="auth",
-            details="User logged in successfully"
+            details="User logged in successfully",
         )
 
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            user=user_info
+            user=user_info,
         )
 
     async def get_user_by_id(self, user_id: str) -> Optional[UserInfo]:
@@ -246,7 +243,7 @@ class AuthService:
         resource_name: Optional[str] = None,
         namespace: Optional[str] = None,
         details: Optional[str] = None,
-        ip_address: Optional[str] = None
+        ip_address: Optional[str] = None,
     ):
         """Log an audit action."""
         log_entry = {
@@ -273,7 +270,7 @@ class AuthService:
         action: Optional[str] = None,
         resource_type: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> tuple[List[AuditLogEntry], int]:
         """Get audit logs with filtering."""
         logs = self._audit_logs.copy()
@@ -290,7 +287,7 @@ class AuthService:
         logs.sort(key=lambda x: x["timestamp"], reverse=True)
 
         total = len(logs)
-        logs = logs[offset:offset + limit]
+        logs = logs[offset : offset + limit]
 
         return [
             AuditLogEntry(

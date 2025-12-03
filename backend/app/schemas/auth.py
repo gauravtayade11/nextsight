@@ -1,8 +1,10 @@
 from __future__ import annotations
-from pydantic import BaseModel, Field
-from typing import Optional, List, TYPE_CHECKING
+
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class UserRole(str, Enum):

@@ -1,12 +1,18 @@
-from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 
-from app.services.cluster_service import cluster_service
-from app.schemas.cluster import (
-    ClusterInfo, ClusterHealth, ClusterListResponse,
-    SetActiveClusterRequest, ClusterContextInfo, AddClusterRequest, ClusterConfig
-)
+from fastapi import APIRouter, Depends, HTTPException
+
 from app.core.security import require_role
+from app.schemas.cluster import (
+    AddClusterRequest,
+    ClusterConfig,
+    ClusterContextInfo,
+    ClusterHealth,
+    ClusterInfo,
+    ClusterListResponse,
+    SetActiveClusterRequest,
+)
+from app.services.cluster_service import cluster_service
 
 router = APIRouter()
 
@@ -16,11 +22,7 @@ async def list_clusters():
     """List all configured Kubernetes clusters."""
     clusters = await cluster_service.list_clusters()
     active_id = await cluster_service.get_active_cluster()
-    return ClusterListResponse(
-        clusters=clusters,
-        active_cluster_id=active_id,
-        total=len(clusters)
-    )
+    return ClusterListResponse(clusters=clusters, active_cluster_id=active_id, total=len(clusters))
 
 
 @router.get("/active")
@@ -70,17 +72,14 @@ async def get_cluster_health(cluster_id: str):
 
 
 @router.post("", response_model=ClusterInfo)
-async def add_cluster(
-    request: AddClusterRequest,
-    current_user = Depends(require_role("admin"))
-):
+async def add_cluster(request: AddClusterRequest, current_user=Depends(require_role("admin"))):
     """Add a new cluster configuration. Admin only."""
     cluster_config = ClusterConfig(
         id=request.id,
         name=request.name,
         context=request.context,
         kubeconfig_path=request.kubeconfig_path,
-        is_default=request.is_default
+        is_default=request.is_default,
     )
 
     success = await cluster_service.add_cluster(cluster_config)
@@ -95,10 +94,7 @@ async def add_cluster(
 
 
 @router.delete("/{cluster_id}")
-async def delete_cluster(
-    cluster_id: str,
-    current_user = Depends(require_role("admin"))
-):
+async def delete_cluster(cluster_id: str, current_user=Depends(require_role("admin"))):
     """Delete a cluster configuration. Admin only."""
     success = await cluster_service.remove_cluster(cluster_id)
     if not success:

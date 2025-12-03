@@ -1,13 +1,19 @@
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
-import subprocess
 import logging
-import uuid
 import re
+import subprocess
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from app.schemas.gitflow import (
-    GitFlowBranch, BranchType, ReleaseCandidate, ReleaseStatus,
-    DeploymentStatus, Environment, GitFlowConfig, ReleaseHistory
+    BranchType,
+    DeploymentStatus,
+    Environment,
+    GitFlowBranch,
+    GitFlowConfig,
+    ReleaseCandidate,
+    ReleaseHistory,
+    ReleaseStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,12 +28,7 @@ class GitFlowService:
 
     def _run_git(self, *args) -> tuple[bool, str]:
         try:
-            result = subprocess.run(
-                ["git", *args],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True
-            )
+            result = subprocess.run(["git", *args], cwd=self.repo_path, capture_output=True, text=True)
             return result.returncode == 0, result.stdout.strip() or result.stderr.strip()
         except Exception as e:
             logger.error(f"Git command failed: {e}")
@@ -51,12 +52,14 @@ class GitFlowService:
             _, last_commit = self._run_git("rev-parse", "--short", branch_name)
             _, created_date = self._run_git("log", "-1", "--format=%ci", branch_name)
 
-            branches.append(GitFlowBranch(
-                name=branch_name,
-                branch_type=detected_type,
-                last_commit=last_commit if last_commit else None,
-                created_at=datetime.fromisoformat(created_date) if created_date else None
-            ))
+            branches.append(
+                GitFlowBranch(
+                    name=branch_name,
+                    branch_type=detected_type,
+                    last_commit=last_commit if last_commit else None,
+                    created_at=datetime.fromisoformat(created_date) if created_date else None,
+                )
+            )
 
         return branches
 
@@ -79,7 +82,7 @@ class GitFlowService:
         source_branch: str = "develop",
         changelog: Optional[str] = None,
         created_by: Optional[str] = None,
-        auto_create_branch: bool = True
+        auto_create_branch: bool = True,
     ) -> ReleaseCandidate:
         release_id = str(uuid.uuid4())
         release_branch = f"{self.config.release_prefix}{version}"
@@ -106,7 +109,7 @@ class GitFlowService:
             commits=commits,
             changelog=changelog or self._generate_changelog(commits),
             created_by=created_by,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
         self._releases[release_id] = release
@@ -116,15 +119,9 @@ class GitFlowService:
         _, last_tag = self._run_git("describe", "--tags", "--abbrev=0", branch)
 
         if last_tag:
-            _, log_output = self._run_git(
-                "log", f"{last_tag}..{branch}",
-                "--pretty=format:%H|%s|%an|%ci"
-            )
+            _, log_output = self._run_git("log", f"{last_tag}..{branch}", "--pretty=format:%H|%s|%an|%ci")
         else:
-            _, log_output = self._run_git(
-                "log", branch, "-20",
-                "--pretty=format:%H|%s|%an|%ci"
-            )
+            _, log_output = self._run_git("log", branch, "-20", "--pretty=format:%H|%s|%an|%ci")
 
         commits = []
         for line in log_output.split("\n"):
@@ -132,12 +129,7 @@ class GitFlowService:
                 continue
             parts = line.split("|")
             if len(parts) >= 4:
-                commits.append({
-                    "sha": parts[0][:8],
-                    "message": parts[1],
-                    "author": parts[2],
-                    "date": parts[3]
-                })
+                commits.append({"sha": parts[0][:8], "message": parts[1], "author": parts[2], "date": parts[3]})
         return commits
 
     def _generate_changelog(self, commits: List[Dict[str, Any]]) -> str:
@@ -175,11 +167,7 @@ class GitFlowService:
 
         return changelog
 
-    async def approve_release(
-        self,
-        release_id: str,
-        approved_by: str
-    ) -> ReleaseCandidate:
+    async def approve_release(self, release_id: str, approved_by: str) -> ReleaseCandidate:
         if release_id not in self._releases:
             raise ValueError(f"Release {release_id} not found")
 
@@ -196,27 +184,22 @@ class GitFlowService:
         release = self._releases[release_id]
 
         self._run_git("checkout", self.config.main_branch)
-        self._run_git("merge", "--no-ff", release.release_branch,
-                     "-m", f"Merge release {release.version}")
+        self._run_git("merge", "--no-ff", release.release_branch, "-m", f"Merge release {release.version}")
 
         tag_name = f"{self.config.version_tag_prefix}{release.version}"
         self._run_git("tag", "-a", tag_name, "-m", f"Release {release.version}")
 
         self._run_git("checkout", self.config.develop_branch)
-        self._run_git("merge", "--no-ff", release.release_branch,
-                     "-m", f"Merge release {release.version} back to develop")
+        self._run_git(
+            "merge", "--no-ff", release.release_branch, "-m", f"Merge release {release.version} back to develop"
+        )
 
         self._run_git("branch", "-d", release.release_branch)
 
         release.status = ReleaseStatus.DEPLOYED
         return release
 
-    async def create_hotfix(
-        self,
-        version: str,
-        description: str,
-        created_by: Optional[str] = None
-    ) -> ReleaseCandidate:
+    async def create_hotfix(self, version: str, description: str, created_by: Optional[str] = None) -> ReleaseCandidate:
         hotfix_branch = f"{self.config.hotfix_prefix}{version}"
 
         self._run_git("checkout", self.config.main_branch)
@@ -232,7 +215,7 @@ class GitFlowService:
             commits=[],
             changelog=f"# Hotfix {version}\n\n{description}",
             created_by=created_by,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
         self._releases[release.id] = release
@@ -245,16 +228,16 @@ class GitFlowService:
         release = self._releases[release_id]
 
         self._run_git("checkout", self.config.main_branch)
-        self._run_git("merge", "--no-ff", release.release_branch,
-                     "-m", f"Merge hotfix {release.version}")
+        self._run_git("merge", "--no-ff", release.release_branch, "-m", f"Merge hotfix {release.version}")
 
         tag_name = f"{self.config.version_tag_prefix}{release.version}"
         self._run_git("tag", "-a", tag_name, "-m", f"Hotfix {release.version}")
 
         if self.config.auto_merge_hotfix_to_develop:
             self._run_git("checkout", self.config.develop_branch)
-            self._run_git("merge", "--no-ff", release.release_branch,
-                         "-m", f"Merge hotfix {release.version} to develop")
+            self._run_git(
+                "merge", "--no-ff", release.release_branch, "-m", f"Merge hotfix {release.version} to develop"
+            )
 
         self._run_git("branch", "-d", release.release_branch)
 
@@ -264,11 +247,7 @@ class GitFlowService:
     async def get_release(self, release_id: str) -> Optional[ReleaseCandidate]:
         return self._releases.get(release_id)
 
-    async def get_releases(
-        self,
-        status: Optional[ReleaseStatus] = None,
-        limit: int = 20
-    ) -> ReleaseHistory:
+    async def get_releases(self, status: Optional[ReleaseStatus] = None, limit: int = 20) -> ReleaseHistory:
         releases = list(self._releases.values())
 
         if status:
@@ -277,10 +256,7 @@ class GitFlowService:
         releases.sort(key=lambda x: x.created_at, reverse=True)
         releases = releases[:limit]
 
-        return ReleaseHistory(
-            releases=releases,
-            total_count=len(self._releases)
-        )
+        return ReleaseHistory(releases=releases, total_count=len(self._releases))
 
     async def get_current_versions(self) -> Dict[str, str]:
         versions = {}

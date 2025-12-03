@@ -1,16 +1,21 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
 
+from fastapi import APIRouter, HTTPException, Query
+
+from app.schemas.incident import (
+    IncidentAnalysisRequest,
+    IncidentAnalysisResponse,
+    IncidentCreate,
+    IncidentResponse,
+    IncidentSeverity,
+    IncidentStatus,
+    IncidentUpdate,
+)
 from app.services.ai_analysis_service import ai_analysis_service
 from app.services.kubernetes_service import kubernetes_service
 from app.services.timeline_service import timeline_service
-from app.schemas.incident import (
-    IncidentCreate, IncidentUpdate, IncidentResponse,
-    IncidentAnalysisRequest, IncidentAnalysisResponse,
-    IncidentSeverity, IncidentStatus
-)
 
 router = APIRouter()
 
@@ -23,7 +28,7 @@ async def list_incidents(
     severity: Optional[IncidentSeverity] = Query(None),
     namespace: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0)
+    offset: int = Query(0, ge=0),
 ):
     """List all incidents with optional filters."""
     incidents = list(_incidents.values())
@@ -36,7 +41,7 @@ async def list_incidents(
         incidents = [i for i in incidents if i.namespace == namespace]
 
     incidents.sort(key=lambda x: x.created_at, reverse=True)
-    return incidents[offset:offset + limit]
+    return incidents[offset : offset + limit]
 
 
 @router.post("", response_model=IncidentResponse)
@@ -61,7 +66,7 @@ async def create_incident(incident: IncidentCreate):
         assigned_to=None,
         resolved_at=None,
         created_at=now,
-        updated_at=now
+        updated_at=now,
     )
 
     _incidents[incident_id] = response
@@ -114,7 +119,9 @@ async def analyze_incident(incident_id: str, request: IncidentAnalysisRequest):
                 "namespace": incident.namespace,
                 "pods": [{"name": p.name, "status": p.status.value, "restarts": p.restarts} for p in pods],
                 "events": [{"reason": e.reason, "message": e.message, "type": e.type} for e in events],
-                "deployments": [{"name": d.name, "ready": d.ready_replicas, "desired": d.replicas} for d in deployments]
+                "deployments": [
+                    {"name": d.name, "ready": d.ready_replicas, "desired": d.replicas} for d in deployments
+                ],
             }
         except Exception:
             k8s_context = None
@@ -122,15 +129,14 @@ async def analyze_incident(incident_id: str, request: IncidentAnalysisRequest):
     timeline_events = None
     try:
         correlation = await timeline_service.get_events_for_incident(
-            incident_id=incident_id,
-            incident_timestamp=incident.created_at
+            incident_id=incident_id, incident_timestamp=incident.created_at
         )
         timeline_events = [
             {
                 "title": e.title,
                 "type": e.event_type.value,
                 "source": e.source.value,
-                "timestamp": e.event_timestamp.isoformat()
+                "timestamp": e.event_timestamp.isoformat(),
             }
             for e in correlation.events_before + correlation.events_during
         ]
@@ -145,7 +151,7 @@ async def analyze_incident(incident_id: str, request: IncidentAnalysisRequest):
         k8s_context=k8s_context,
         jenkins_context=None,
         timeline_events=timeline_events,
-        additional_context=request.additional_context
+        additional_context=request.additional_context,
     )
 
     incident.ai_analysis = analysis.analysis
@@ -168,9 +174,7 @@ async def suggest_runbook(incident_id: str):
         symptoms.append(incident.description)
 
     runbook = await ai_analysis_service.suggest_runbook(
-        incident_type=incident.severity.value,
-        symptoms=symptoms,
-        affected_services=incident.affected_services
+        incident_type=incident.severity.value, symptoms=symptoms, affected_services=incident.affected_services
     )
 
     return runbook
@@ -185,8 +189,7 @@ async def get_incident_timeline(incident_id: str):
     incident = _incidents[incident_id]
 
     correlation = await timeline_service.get_events_for_incident(
-        incident_id=incident_id,
-        incident_timestamp=incident.created_at
+        incident_id=incident_id, incident_timestamp=incident.created_at
     )
 
     return correlation

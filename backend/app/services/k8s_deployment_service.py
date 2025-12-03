@@ -1,16 +1,14 @@
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
-from kubernetes import client
-from kubernetes.client.rest import ApiException
+import asyncio
 import logging
 import uuid
-import asyncio
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
+from kubernetes import client
+from kubernetes.client.rest import ApiException
+
+from app.schemas.gitflow import DeploymentRequest, DeploymentStatus, Environment, ReleaseStatus, RollbackRequest
 from app.services.kubernetes_service import kubernetes_service
-from app.schemas.gitflow import (
-    DeploymentStatus, DeploymentRequest, RollbackRequest,
-    Environment, ReleaseStatus
-)
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +29,7 @@ class K8sDeploymentService:
         dry_run: bool = False,
         wait_for_ready: bool = True,
         timeout_seconds: int = 300,
-        deployed_by: Optional[str] = None
+        deployed_by: Optional[str] = None,
     ) -> DeploymentStatus:
         deployment_id = str(uuid.uuid4())
 
@@ -44,7 +42,7 @@ class K8sDeploymentService:
             services=[],
             started_at=datetime.now(timezone.utc),
             deployed_by=deployed_by,
-            rollback_available=False
+            rollback_available=False,
         )
 
         self._deployments[deployment_id] = deployment_status
@@ -61,30 +59,28 @@ class K8sDeploymentService:
             service_results = []
             for service_name in services:
                 if dry_run:
-                    service_results.append({
-                        "name": service_name,
-                        "status": "dry_run",
-                        "new_image": f"{image_registry}/{service_name}:{version}",
-                        "message": "Dry run - no changes made"
-                    })
+                    service_results.append(
+                        {
+                            "name": service_name,
+                            "status": "dry_run",
+                            "new_image": f"{image_registry}/{service_name}:{version}",
+                            "message": "Dry run - no changes made",
+                        }
+                    )
                     continue
 
                 result = await self._update_deployment_image(
                     namespace=namespace,
                     deployment_name=service_name,
                     new_image=f"{image_registry}/{service_name}:{version}",
-                    version=version
+                    version=version,
                 )
                 service_results.append(result)
 
             deployment_status.services = service_results
 
             if not dry_run and wait_for_ready:
-                await self._wait_for_rollout(
-                    namespace=namespace,
-                    deployments=services,
-                    timeout=timeout_seconds
-                )
+                await self._wait_for_rollout(namespace=namespace, deployments=services, timeout=timeout_seconds)
                 deployment_status.status = "deployed"
             elif dry_run:
                 deployment_status.status = "dry_run_complete"
@@ -101,16 +97,10 @@ class K8sDeploymentService:
         except Exception as e:
             logger.error(f"Deployment failed: {e}")
             deployment_status.status = "failed"
-            deployment_status.services.append({
-                "error": str(e)
-            })
+            deployment_status.services.append({"error": str(e)})
             return deployment_status
 
-    async def _get_current_versions(
-        self,
-        namespace: str,
-        services: List[str]
-    ) -> Dict[str, str]:
+    async def _get_current_versions(self, namespace: str, services: List[str]) -> Dict[str, str]:
         versions = {}
         apps_v1 = kubernetes_service._apps_v1
 
@@ -132,11 +122,7 @@ class K8sDeploymentService:
         return versions
 
     async def _update_deployment_image(
-        self,
-        namespace: str,
-        deployment_name: str,
-        new_image: str,
-        version: str
+        self, namespace: str, deployment_name: str, new_image: str, version: str
     ) -> Dict[str, Any]:
         apps_v1 = kubernetes_service._apps_v1
 
@@ -149,40 +135,29 @@ class K8sDeploymentService:
             if not deployment.spec.template.metadata.annotations:
                 deployment.spec.template.metadata.annotations = {}
 
-            deployment.spec.template.metadata.annotations.update({
-                "nexops.io/version": version,
-                "nexops.io/deployed-at": datetime.now(timezone.utc).isoformat(),
-                "nexops.io/previous-image": old_image
-            })
-
-            apps_v1.replace_namespaced_deployment(
-                name=deployment_name,
-                namespace=namespace,
-                body=deployment
+            deployment.spec.template.metadata.annotations.update(
+                {
+                    "nexops.io/version": version,
+                    "nexops.io/deployed-at": datetime.now(timezone.utc).isoformat(),
+                    "nexops.io/previous-image": old_image,
+                }
             )
+
+            apps_v1.replace_namespaced_deployment(name=deployment_name, namespace=namespace, body=deployment)
 
             return {
                 "name": deployment_name,
                 "status": "updated",
                 "old_image": old_image,
                 "new_image": new_image,
-                "message": f"Updated {deployment_name} to {version}"
+                "message": f"Updated {deployment_name} to {version}",
             }
 
         except ApiException as e:
             logger.error(f"Failed to update deployment {deployment_name}: {e}")
-            return {
-                "name": deployment_name,
-                "status": "failed",
-                "error": str(e)
-            }
+            return {"name": deployment_name, "status": "failed", "error": str(e)}
 
-    async def _wait_for_rollout(
-        self,
-        namespace: str,
-        deployments: List[str],
-        timeout: int = 300
-    ) -> bool:
+    async def _wait_for_rollout(self, namespace: str, deployments: List[str], timeout: int = 300) -> bool:
         apps_v1 = kubernetes_service._apps_v1
         start_time = datetime.now(timezone.utc)
 
@@ -191,9 +166,7 @@ class K8sDeploymentService:
 
             for deployment_name in deployments:
                 try:
-                    deployment = apps_v1.read_namespaced_deployment(
-                        deployment_name, namespace
-                    )
+                    deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
 
                     ready = deployment.status.ready_replicas or 0
                     desired = deployment.spec.replicas or 1
@@ -212,9 +185,7 @@ class K8sDeploymentService:
 
             elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
             if elapsed >= timeout:
-                raise TimeoutError(
-                    f"Rollout timed out after {timeout} seconds"
-                )
+                raise TimeoutError(f"Rollout timed out after {timeout} seconds")
 
             await asyncio.sleep(5)
 
@@ -223,7 +194,7 @@ class K8sDeploymentService:
         deployment_id: str,
         target_version: Optional[str] = None,
         reason: str = "",
-        rolled_back_by: Optional[str] = None
+        rolled_back_by: Optional[str] = None,
     ) -> DeploymentStatus:
         if deployment_id not in self._deployments:
             raise ValueError(f"Deployment {deployment_id} not found")
@@ -242,7 +213,7 @@ class K8sDeploymentService:
             status="rolling_back",
             services=[],
             started_at=datetime.now(timezone.utc),
-            deployed_by=rolled_back_by
+            deployed_by=rolled_back_by,
         )
 
         self._deployments[rollback_id] = rollback_status
@@ -259,39 +230,38 @@ class K8sDeploymentService:
                         base_image = previous_image.rsplit(":", 1)[0]
                         previous_image = f"{base_image}:{target_version}"
 
-                    deployment = apps_v1.read_namespaced_deployment(
-                        deployment_name, original_deployment.namespace
-                    )
+                    deployment = apps_v1.read_namespaced_deployment(deployment_name, original_deployment.namespace)
 
                     deployment.spec.template.spec.containers[0].image = previous_image
 
                     if not deployment.spec.template.metadata.annotations:
                         deployment.spec.template.metadata.annotations = {}
 
-                    deployment.spec.template.metadata.annotations.update({
-                        "nexops.io/rollback-reason": reason,
-                        "nexops.io/rolled-back-at": datetime.now(timezone.utc).isoformat(),
-                        "nexops.io/rolled-back-by": rolled_back_by or "system"
-                    })
-
-                    apps_v1.replace_namespaced_deployment(
-                        name=deployment_name,
-                        namespace=original_deployment.namespace,
-                        body=deployment
+                    deployment.spec.template.metadata.annotations.update(
+                        {
+                            "nexops.io/rollback-reason": reason,
+                            "nexops.io/rolled-back-at": datetime.now(timezone.utc).isoformat(),
+                            "nexops.io/rolled-back-by": rolled_back_by or "system",
+                        }
                     )
 
-                    rollback_status.services.append({
-                        "name": deployment_name,
-                        "status": "rolled_back",
-                        "restored_image": previous_image,
-                        "reason": reason
-                    })
+                    apps_v1.replace_namespaced_deployment(
+                        name=deployment_name, namespace=original_deployment.namespace, body=deployment
+                    )
+
+                    rollback_status.services.append(
+                        {
+                            "name": deployment_name,
+                            "status": "rolled_back",
+                            "restored_image": previous_image,
+                            "reason": reason,
+                        }
+                    )
 
             await self._wait_for_rollout(
                 namespace=original_deployment.namespace,
-                deployments=[s["name"] for s in rollback_status.services
-                           if isinstance(s, dict) and "name" in s],
-                timeout=300
+                deployments=[s["name"] for s in rollback_status.services if isinstance(s, dict) and "name" in s],
+                timeout=300,
             )
 
             rollback_status.status = "rolled_back"
@@ -310,22 +280,12 @@ class K8sDeploymentService:
     async def get_deployment_status(self, deployment_id: str) -> Optional[DeploymentStatus]:
         return self._deployments.get(deployment_id)
 
-    async def get_deployment_history(
-        self,
-        namespace: str,
-        limit: int = 20
-    ) -> List[DeploymentStatus]:
+    async def get_deployment_history(self, namespace: str, limit: int = 20) -> List[DeploymentStatus]:
         history = self._deployment_history.get(namespace, [])
         return sorted(history, key=lambda x: x.started_at, reverse=True)[:limit]
 
-    async def get_environment_status(
-        self,
-        environment: Environment
-    ) -> Dict[str, Any]:
-        env_deployments = [
-            d for d in self._deployments.values()
-            if d.environment == environment
-        ]
+    async def get_environment_status(self, environment: Environment) -> Dict[str, Any]:
+        env_deployments = [d for d in self._deployments.values() if d.environment == environment]
 
         latest = None
         if env_deployments:
@@ -335,12 +295,8 @@ class K8sDeploymentService:
             "environment": environment.value,
             "total_deployments": len(env_deployments),
             "latest_deployment": latest,
-            "successful_deployments": sum(
-                1 for d in env_deployments if d.status == "deployed"
-            ),
-            "failed_deployments": sum(
-                1 for d in env_deployments if d.status == "failed"
-            )
+            "successful_deployments": sum(1 for d in env_deployments if d.status == "deployed"),
+            "failed_deployments": sum(1 for d in env_deployments if d.status == "failed"),
         }
 
 

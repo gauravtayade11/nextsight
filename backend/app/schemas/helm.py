@@ -1,14 +1,17 @@
 """
 Helm-related Pydantic models for chart deployment management.
 """
+
 from datetime import datetime
-from typing import Any, Dict, List, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
 class ReleaseStatus(str, Enum):
     """Helm release status types."""
+
     DEPLOYED = "deployed"
     FAILED = "failed"
     PENDING_INSTALL = "pending-install"
@@ -21,6 +24,7 @@ class ReleaseStatus(str, Enum):
 
 class ChartInfo(BaseModel):
     """Helm chart information."""
+
     name: str
     version: str
     app_version: Optional[str] = None
@@ -35,6 +39,7 @@ class ChartInfo(BaseModel):
 
 class ReleaseInfo(BaseModel):
     """Helm release information."""
+
     name: str
     namespace: str
     revision: int
@@ -48,6 +53,7 @@ class ReleaseInfo(BaseModel):
 
 class ReleaseHistory(BaseModel):
     """Helm release revision history entry."""
+
     revision: int
     status: ReleaseStatus
     chart: str
@@ -59,12 +65,14 @@ class ReleaseHistory(BaseModel):
 
 class ReleaseValues(BaseModel):
     """Helm release values."""
+
     user_supplied: Dict[str, Any] = Field(default_factory=dict)
     computed: Dict[str, Any] = Field(default_factory=dict)
 
 
 class Repository(BaseModel):
     """Helm repository information."""
+
     name: str
     url: str
     is_default: bool = False
@@ -72,6 +80,7 @@ class Repository(BaseModel):
 
 class InstallRequest(BaseModel):
     """Request model for installing a Helm chart."""
+
     release_name: str
     chart: str  # chart name or URL
     namespace: str = "default"
@@ -86,6 +95,7 @@ class InstallRequest(BaseModel):
 
 class UpgradeRequest(BaseModel):
     """Request model for upgrading a Helm release."""
+
     chart: Optional[str] = None  # Optional for using current chart
     version: Optional[str] = None
     values: Dict[str, Any] = Field(default_factory=dict)
@@ -100,6 +110,7 @@ class UpgradeRequest(BaseModel):
 
 class RollbackRequest(BaseModel):
     """Request model for rolling back a Helm release."""
+
     revision: int
     wait: bool = False
     timeout: int = 300
@@ -109,6 +120,7 @@ class RollbackRequest(BaseModel):
 
 class UninstallRequest(BaseModel):
     """Request model for uninstalling a Helm release."""
+
     keep_history: bool = False
     dry_run: bool = False
     timeout: int = 300
@@ -116,6 +128,7 @@ class UninstallRequest(BaseModel):
 
 class ChartSearchResult(BaseModel):
     """Chart search result."""
+
     name: str
     version: str
     app_version: Optional[str] = None
@@ -125,6 +138,7 @@ class ChartSearchResult(BaseModel):
 
 class HelmOperationResult(BaseModel):
     """Result of a Helm operation."""
+
     success: bool
     message: str
     release: Optional[ReleaseInfo] = None
@@ -134,16 +148,19 @@ class HelmOperationResult(BaseModel):
 
 class ReleaseListResponse(BaseModel):
     """Response model for listing releases."""
+
     releases: List[ReleaseInfo]
     total: int
 
 
 class ChartListResponse(BaseModel):
     """Response model for listing charts."""
+
     charts: List[ChartInfo]
     total: int
 
 
 class RepositoryListResponse(BaseModel):
     """Response model for listing repositories."""
+
     repositories: List[Repository]

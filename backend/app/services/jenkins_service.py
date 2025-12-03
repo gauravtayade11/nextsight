@@ -1,13 +1,11 @@
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
-import jenkins
 import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+import jenkins
 
 from app.core.config import settings
-from app.schemas.jenkins import (
-    JobInfo, BuildInfo, BuildResult, PipelineStage,
-    PipelineInfo, JenkinsHealth
-)
+from app.schemas.jenkins import BuildInfo, BuildResult, JenkinsHealth, JobInfo, PipelineInfo, PipelineStage
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +21,7 @@ class JenkinsService:
 
         try:
             self._server = jenkins.Jenkins(
-                settings.JENKINS_URL,
-                username=settings.JENKINS_USERNAME,
-                password=settings.JENKINS_TOKEN
+                settings.JENKINS_URL, username=settings.JENKINS_USERNAME, password=settings.JENKINS_TOKEN
             )
             self._server.get_whoami()
             self._initialized = True
@@ -53,17 +49,19 @@ class JenkinsService:
                 if job_info.get("healthReport"):
                     health_score = job_info["healthReport"][0].get("score", 100)
 
-                result.append(JobInfo(
-                    name=job["name"],
-                    url=job.get("url", ""),
-                    color=job.get("color", "notbuilt"),
-                    buildable=job_info.get("buildable", False),
-                    last_build_number=last_build["number"] if last_build else None,
-                    last_successful_build=last_successful["number"] if last_successful else None,
-                    last_failed_build=last_failed["number"] if last_failed else None,
-                    health_score=health_score,
-                    description=job_info.get("description")
-                ))
+                result.append(
+                    JobInfo(
+                        name=job["name"],
+                        url=job.get("url", ""),
+                        color=job.get("color", "notbuilt"),
+                        buildable=job_info.get("buildable", False),
+                        last_build_number=last_build["number"] if last_build else None,
+                        last_successful_build=last_successful["number"] if last_successful else None,
+                        last_failed_build=last_failed["number"] if last_failed else None,
+                        health_score=health_score,
+                        description=job_info.get("description"),
+                    )
+                )
 
             return result
         except Exception as e:
@@ -92,7 +90,7 @@ class JenkinsService:
                 last_successful_build=last_successful["number"] if last_successful else None,
                 last_failed_build=last_failed["number"] if last_failed else None,
                 health_score=health_score,
-                description=job_info.get("description")
+                description=job_info.get("description"),
             )
         except Exception as e:
             logger.error(f"Error getting job {job_name}: {e}")
@@ -109,10 +107,7 @@ class JenkinsService:
             elif build_info.get("result"):
                 result = BuildResult(build_info["result"])
 
-            timestamp = datetime.fromtimestamp(
-                build_info["timestamp"] / 1000,
-                tz=timezone.utc
-            )
+            timestamp = datetime.fromtimestamp(build_info["timestamp"] / 1000, tz=timezone.utc)
 
             triggered_by = None
             for action in build_info.get("actions", []):
@@ -125,16 +120,15 @@ class JenkinsService:
             changes = []
             changeset = build_info.get("changeSet", {})
             for item in changeset.get("items", []):
-                changes.append({
-                    "commit": item.get("commitId", "")[:8],
-                    "author": item.get("author", {}).get("fullName", ""),
-                    "message": item.get("msg", "")
-                })
+                changes.append(
+                    {
+                        "commit": item.get("commitId", "")[:8],
+                        "author": item.get("author", {}).get("fullName", ""),
+                        "message": item.get("msg", ""),
+                    }
+                )
 
-            artifacts = [
-                a.get("fileName", "")
-                for a in build_info.get("artifacts", [])
-            ]
+            artifacts = [a.get("fileName", "") for a in build_info.get("artifacts", [])]
 
             return BuildInfo(
                 number=build_number,
@@ -147,7 +141,7 @@ class JenkinsService:
                 description=build_info.get("description"),
                 triggered_by=triggered_by,
                 changes=changes,
-                artifacts=artifacts
+                artifacts=artifacts,
             )
         except Exception as e:
             logger.error(f"Error getting build {job_name}#{build_number}: {e}")
@@ -161,11 +155,7 @@ class JenkinsService:
             logger.error(f"Error getting build log: {e}")
             raise
 
-    async def trigger_build(
-        self,
-        job_name: str,
-        parameters: Optional[Dict[str, str]] = None
-    ) -> int:
+    async def trigger_build(self, job_name: str, parameters: Optional[Dict[str, str]] = None) -> int:
         self._initialize()
         try:
             if parameters:
@@ -196,7 +186,7 @@ class JenkinsService:
                     "task": item.get("task", {}).get("name"),
                     "why": item.get("why"),
                     "stuck": item.get("stuck", False),
-                    "blocked": item.get("blocked", False)
+                    "blocked": item.get("blocked", False),
                 }
                 for item in queue_info
             ]
@@ -244,7 +234,7 @@ class JenkinsService:
                 running_builds=running_builds,
                 queued_builds=len(queue_info),
                 failed_jobs_24h=failed_24h,
-                success_rate_24h=round(success_rate, 2)
+                success_rate_24h=round(success_rate, 2),
             )
         except Exception as e:
             logger.error(f"Error getting Jenkins health: {e}")
@@ -255,7 +245,7 @@ class JenkinsService:
                 running_builds=0,
                 queued_builds=0,
                 failed_jobs_24h=0,
-                success_rate_24h=0.0
+                success_rate_24h=0.0,
             )
 
 

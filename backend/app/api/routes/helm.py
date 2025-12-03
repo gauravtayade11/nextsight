@@ -1,9 +1,13 @@
 """
 Helm API routes for chart deployment management.
 """
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Query, Depends
 
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.core.security import get_current_user, require_permission
+from app.schemas.auth import UserInfo
 from app.schemas.helm import (
     ChartInfo,
     ChartListResponse,
@@ -21,13 +25,12 @@ from app.schemas.helm import (
     UpgradeRequest,
 )
 from app.services.helm_service import helm_service
-from app.core.security import get_current_user, require_permission
-from app.schemas.auth import UserInfo
 
 router = APIRouter(prefix="/helm", tags=["helm"])
 
 
 # ============== Releases ==============
+
 
 @router.get("/releases", response_model=ReleaseListResponse)
 async def list_releases(
@@ -36,10 +39,7 @@ async def list_releases(
     current_user: UserInfo = Depends(get_current_user),
 ):
     """List all Helm releases."""
-    releases = await helm_service.list_releases(
-        namespace=namespace,
-        all_namespaces=all_namespaces
-    )
+    releases = await helm_service.list_releases(namespace=namespace, all_namespaces=all_namespaces)
     return ReleaseListResponse(releases=releases, total=len(releases))
 
 
@@ -123,6 +123,7 @@ async def uninstall_release(
 
 # ============== Repositories ==============
 
+
 @router.get("/repositories", response_model=RepositoryListResponse)
 async def list_repositories(
     current_user: UserInfo = Depends(get_current_user),
@@ -158,6 +159,7 @@ async def remove_repository(
 
 
 # ============== Charts ==============
+
 
 @router.get("/charts/search", response_model=List[ChartSearchResult])
 async def search_charts(

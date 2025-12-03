@@ -1,9 +1,24 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import (
+    auth,
+    clusters,
+    cost,
+    gitflow,
+    health,
+    helm,
+    incidents,
+    jenkins,
+    kubernetes,
+    security,
+    selfservice,
+    timeline,
+    websocket,
+)
 from app.core.config import settings
-from app.api.routes import kubernetes, jenkins, incidents, timeline, selfservice, health, gitflow, websocket, clusters, auth, helm, cost, security
 
 
 @asynccontextmanager

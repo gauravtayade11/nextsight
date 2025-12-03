@@ -1,14 +1,17 @@
 """
 Cost analysis related Pydantic models.
 """
+
 from datetime import datetime
-from typing import Dict, List, Optional
 from enum import Enum
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
 class ResourceType(str, Enum):
     """Types of Kubernetes resources for cost tracking."""
+
     CPU = "cpu"
     MEMORY = "memory"
     STORAGE = "storage"
@@ -18,6 +21,7 @@ class ResourceType(str, Enum):
 
 class TimeGranularity(str, Enum):
     """Time granularity for cost aggregation."""
+
     HOURLY = "hourly"
     DAILY = "daily"
     WEEKLY = "weekly"
@@ -26,6 +30,7 @@ class TimeGranularity(str, Enum):
 
 class CostBreakdown(BaseModel):
     """Cost breakdown by resource type."""
+
     cpu: float = 0.0
     memory: float = 0.0
     storage: float = 0.0
@@ -36,6 +41,7 @@ class CostBreakdown(BaseModel):
 
 class NamespaceCost(BaseModel):
     """Cost information for a namespace."""
+
     namespace: str
     costs: CostBreakdown
     pod_count: int = 0
@@ -45,6 +51,7 @@ class NamespaceCost(BaseModel):
 
 class PodCost(BaseModel):
     """Cost information for a pod."""
+
     name: str
     namespace: str
     costs: CostBreakdown
@@ -59,12 +66,14 @@ class PodCost(BaseModel):
 
 class CostTrend(BaseModel):
     """Cost trend data point."""
+
     timestamp: datetime
     costs: CostBreakdown
 
 
 class CostRecommendation(BaseModel):
     """Cost optimization recommendation."""
+
     id: str
     type: str  # e.g., "rightsizing", "unused_resource", "reserved_instance"
     severity: str  # "low", "medium", "high"
@@ -81,6 +90,7 @@ class CostRecommendation(BaseModel):
 
 class CostConfig(BaseModel):
     """Cost configuration including pricing."""
+
     cpu_hourly_cost: float = 0.031611  # per vCPU per hour (average cloud pricing)
     memory_gb_hourly_cost: float = 0.004237  # per GB per hour
     storage_gb_monthly_cost: float = 0.10  # per GB per month
@@ -91,6 +101,7 @@ class CostConfig(BaseModel):
 
 class ClusterCostSummary(BaseModel):
     """Summary of cluster-wide costs."""
+
     total_cost: CostBreakdown
     cost_by_namespace: List[NamespaceCost]
     cost_trend: List[CostTrend]
@@ -103,6 +114,7 @@ class ClusterCostSummary(BaseModel):
 
 class CostAllocationResponse(BaseModel):
     """Response for cost allocation by team/project."""
+
     allocations: Dict[str, CostBreakdown]  # key: team/project name
     total: CostBreakdown
     unallocated: CostBreakdown
@@ -110,6 +122,7 @@ class CostAllocationResponse(BaseModel):
 
 class CostComparisonResponse(BaseModel):
     """Response for cost comparison between periods."""
+
     current_period: CostBreakdown
     previous_period: CostBreakdown
     change_absolute: CostBreakdown
@@ -118,6 +131,7 @@ class CostComparisonResponse(BaseModel):
 
 class ResourceEfficiency(BaseModel):
     """Resource efficiency metrics for a resource."""
+
     name: str
     namespace: str
     resource_type: str
@@ -130,6 +144,7 @@ class ResourceEfficiency(BaseModel):
 
 class CostDashboardResponse(BaseModel):
     """Full cost dashboard response."""
+
     summary: ClusterCostSummary
     namespace_breakdown: List[NamespaceCost]
     recommendations: List[CostRecommendation]

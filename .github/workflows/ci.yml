@@ -63,10 +63,10 @@ jobs:
           pip install pytest pytest-asyncio pytest-cov flake8 black isort mypy
 
       - name: Run Black (code formatting)
-        run: black --check app/
+        run: black --check --line-length 120 app/
 
       - name: Run isort (import sorting)
-        run: isort --check-only app/
+        run: isort --check-only --profile black --line-length 120 app/
 
       - name: Run Flake8 (linting)
         run: flake8 app/ --max-line-length=120 --ignore=E501,W503

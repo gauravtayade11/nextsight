@@ -1,24 +1,26 @@
 """Security scanning and compliance API endpoints."""
-from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import List, Optional
-from datetime import datetime
 
-from app.schemas.security import (
-    SecurityPosture,
-    SecurityDashboardResponse,
-    SecurityFinding,
-    SecurityScore,
-    ImageScanResult,
-    PodSecurityCheck,
-    ComplianceCheck,
-    RemediationRequest,
-    RBACAnalysis,
-    NetworkPolicyCoverage,
-    SecurityTrends,
-)
-from app.services.security_service import get_security_service, SecurityService
+from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from app.core.security import get_current_user
 from app.schemas.auth import UserInfo
+from app.schemas.security import (
+    ComplianceCheck,
+    ImageScanResult,
+    NetworkPolicyCoverage,
+    PodSecurityCheck,
+    RBACAnalysis,
+    RemediationRequest,
+    SecurityDashboardResponse,
+    SecurityFinding,
+    SecurityPosture,
+    SecurityScore,
+    SecurityTrends,
+)
+from app.services.security_service import SecurityService, get_security_service
 
 router = APIRouter(prefix="/security", tags=["Security"])
 
@@ -27,7 +29,7 @@ router = APIRouter(prefix="/security", tags=["Security"])
 async def get_security_posture(
     cluster_id: str = Query("default", description="Cluster ID to scan"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get complete security posture for a cluster.
@@ -52,7 +54,7 @@ async def get_security_posture(
 async def get_security_dashboard(
     cluster_id: str = Query("default", description="Cluster ID"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get security dashboard summary.
@@ -76,10 +78,12 @@ async def get_security_dashboard(
 async def get_security_findings(
     cluster_id: str = Query("default", description="Cluster ID"),
     severity: Optional[str] = Query(None, description="Filter by severity: critical, high, medium, low"),
-    finding_type: Optional[str] = Query(None, description="Filter by type: vulnerability, misconfiguration, compliance, secret, policy_violation"),
+    finding_type: Optional[str] = Query(
+        None, description="Filter by type: vulnerability, misconfiguration, compliance, secret, policy_violation"
+    ),
     namespace: Optional[str] = Query(None, description="Filter by namespace"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get all security findings with optional filters.
@@ -109,7 +113,7 @@ async def get_security_findings(
 async def trigger_security_scan(
     cluster_id: str = Query("default", description="Cluster ID to scan"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Trigger a new security scan.
@@ -139,7 +143,7 @@ async def trigger_security_scan(
             "grade": posture.security_score.grade,
             "total_findings": len(posture.findings),
             "critical_issues": posture.security_score.critical_issues,
-            "high_issues": posture.security_score.high_issues
+            "high_issues": posture.security_score.high_issues,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to trigger security scan: {str(e)}")
@@ -149,7 +153,7 @@ async def trigger_security_scan(
 async def get_security_score(
     cluster_id: str = Query("default", description="Cluster ID"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get security score for a cluster.
@@ -173,7 +177,7 @@ async def get_pod_security_checks(
     namespace: Optional[str] = Query(None, description="Filter by namespace"),
     min_score: Optional[int] = Query(None, description="Minimum security score (0-100)"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get pod security standard checks.
@@ -207,7 +211,7 @@ async def get_compliance_checks(
     category: Optional[str] = Query(None, description="Filter by category"),
     passed: Optional[bool] = Query(None, description="Filter by pass/fail status"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get compliance check results.
@@ -238,7 +242,7 @@ async def get_compliance_checks(
 async def get_image_scan_results(
     cluster_id: str = Query("default", description="Cluster ID"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get container image vulnerability scan results.
@@ -254,10 +258,7 @@ async def get_image_scan_results(
 
 
 @router.post("/remediate")
-async def remediate_finding(
-    request: RemediationRequest,
-    current_user: UserInfo = Depends(get_current_user)
-):
+async def remediate_finding(request: RemediationRequest, current_user: UserInfo = Depends(get_current_user)):
     """
     Request remediation for a security finding.
 
@@ -271,7 +272,7 @@ async def remediate_finding(
         "status": "manual_remediation_required",
         "finding_id": request.finding_id,
         "message": "Auto-remediation is not yet available. Please review the finding's recommendation and apply fixes manually.",
-        "approved_by": request.approved_by
+        "approved_by": request.approved_by,
     }
 
 
@@ -279,8 +280,10 @@ async def remediate_finding(
 
 from pydantic import BaseModel
 
+
 class AIRemediationRequest(BaseModel):
     """Request for AI-powered security remediation advice."""
+
     finding_type: str  # vulnerability, misconfiguration, compliance, rbac, network_policy
     severity: str
     title: str
@@ -293,10 +296,7 @@ class AIRemediationRequest(BaseModel):
 
 
 @router.post("/ai-remediate")
-async def get_ai_remediation(
-    request: AIRemediationRequest,
-    current_user: UserInfo = Depends(get_current_user)
-):
+async def get_ai_remediation(request: AIRemediationRequest, current_user: UserInfo = Depends(get_current_user)):
     """
     Get AI-powered remediation advice for a security finding.
 
@@ -357,10 +357,7 @@ Format your response in markdown with clear sections."""
                     "severity": request.severity,
                     "title": request.title,
                 },
-                "remediation": {
-                    "analysis": response.text,
-                    "generated_at": datetime.now().isoformat()
-                }
+                "remediation": {"analysis": response.text, "generated_at": datetime.now().isoformat()},
             }
     except ImportError:
         pass  # Fall back to rule-based
@@ -383,7 +380,7 @@ def _get_rule_based_remediation(request: AIRemediationRequest) -> dict:
                     "2. Check if a patched version is available",
                     "3. Update the image to the fixed version",
                     "4. Roll out the deployment with the new image",
-                    "5. Verify the vulnerability is resolved by re-scanning"
+                    "5. Verify the vulnerability is resolved by re-scanning",
                 ],
                 "commands": [
                     "# Find pods using the vulnerable image",
@@ -393,14 +390,14 @@ def _get_rule_based_remediation(request: AIRemediationRequest) -> dict:
                     "kubectl set image deployment/DEPLOYMENT_NAME CONTAINER_NAME=NEW_IMAGE:TAG -n NAMESPACE",
                     "",
                     "# Verify rollout",
-                    "kubectl rollout status deployment/DEPLOYMENT_NAME -n NAMESPACE"
+                    "kubectl rollout status deployment/DEPLOYMENT_NAME -n NAMESPACE",
                 ],
                 "prevention": [
                     "Implement image scanning in CI/CD pipeline",
                     "Use image policies to block vulnerable images",
                     "Enable automatic image updates for patch versions",
-                    "Subscribe to security advisories for your images"
-                ]
+                    "Subscribe to security advisories for your images",
+                ],
             },
             "high": {
                 "priority": "HIGH - Address within 24-48 hours",
@@ -409,21 +406,21 @@ def _get_rule_based_remediation(request: AIRemediationRequest) -> dict:
                     "2. Check for available patches or mitigations",
                     "3. Plan and schedule the update",
                     "4. Test the update in a non-production environment",
-                    "5. Deploy the fix during a maintenance window"
+                    "5. Deploy the fix during a maintenance window",
                 ],
                 "commands": [
                     "# List affected deployments",
                     "kubectl get deployments --all-namespaces -o wide",
                     "",
                     "# Check current image versions",
-                    "kubectl get pods -o jsonpath='{.items[*].spec.containers[*].image}' | tr ' ' '\\n' | sort | uniq"
+                    "kubectl get pods -o jsonpath='{.items[*].spec.containers[*].image}' | tr ' ' '\\n' | sort | uniq",
                 ],
                 "prevention": [
                     "Regularly scan images for vulnerabilities",
                     "Maintain an inventory of all container images",
-                    "Set up alerts for new CVEs affecting your images"
-                ]
-            }
+                    "Set up alerts for new CVEs affecting your images",
+                ],
+            },
         },
         "misconfiguration": {
             "privileged_container": {
@@ -432,14 +429,14 @@ def _get_rule_based_remediation(request: AIRemediationRequest) -> dict:
                     "1. Review if privileged access is truly required",
                     "2. If not required, remove the privileged flag",
                     "3. If required, consider using specific capabilities instead",
-                    "4. Apply Pod Security Standards/Policies"
+                    "4. Apply Pod Security Standards/Policies",
                 ],
                 "commands": [
                     "# Remove privileged flag from deployment",
-                    "kubectl patch deployment DEPLOYMENT_NAME -n NAMESPACE --type=json -p='[{\"op\": \"remove\", \"path\": \"/spec/template/spec/containers/0/securityContext/privileged\"}]'",
+                    'kubectl patch deployment DEPLOYMENT_NAME -n NAMESPACE --type=json -p=\'[{"op": "remove", "path": "/spec/template/spec/containers/0/securityContext/privileged"}]\'',
                     "",
                     "# Or update with specific capabilities",
-                    "kubectl patch deployment DEPLOYMENT_NAME -n NAMESPACE --type=json -p='[{\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/securityContext\", \"value\": {\"capabilities\": {\"drop\": [\"ALL\"], \"add\": [\"NET_BIND_SERVICE\"]}}}]'"
+                    'kubectl patch deployment DEPLOYMENT_NAME -n NAMESPACE --type=json -p=\'[{"op": "replace", "path": "/spec/template/spec/containers/0/securityContext", "value": {"capabilities": {"drop": ["ALL"], "add": ["NET_BIND_SERVICE"]}}}]\'',
                 ],
                 "yaml_example": """apiVersion: v1
 kind: Pod
@@ -452,7 +449,7 @@ spec:
       readOnlyRootFilesystem: true
       capabilities:
         drop:
-          - ALL"""
+          - ALL""",
             },
             "root_user": {
                 "priority": "MEDIUM-HIGH - Security Best Practice",
@@ -460,11 +457,11 @@ spec:
                     "1. Check if the application requires root access",
                     "2. Create a non-root user in the Dockerfile",
                     "3. Update the Pod security context",
-                    "4. Test the application with non-root user"
+                    "4. Test the application with non-root user",
                 ],
                 "commands": [
                     "# Add runAsNonRoot to deployment",
-                    "kubectl patch deployment DEPLOYMENT_NAME -n NAMESPACE --type=json -p='[{\"op\": \"add\", \"path\": \"/spec/template/spec/securityContext\", \"value\": {\"runAsNonRoot\": true, \"runAsUser\": 1000}}]'"
+                    'kubectl patch deployment DEPLOYMENT_NAME -n NAMESPACE --type=json -p=\'[{"op": "add", "path": "/spec/template/spec/securityContext", "value": {"runAsNonRoot": true, "runAsUser": 1000}}]\'',
                 ],
                 "yaml_example": """apiVersion: v1
 kind: Pod
@@ -472,8 +469,8 @@ spec:
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
-    fsGroup: 1000"""
-            }
+    fsGroup: 1000""",
+            },
         },
         "rbac": {
             "cluster_admin": {
@@ -483,14 +480,14 @@ spec:
                     "2. Determine minimum required permissions",
                     "3. Create a custom Role/ClusterRole with minimal permissions",
                     "4. Update the RoleBinding/ClusterRoleBinding",
-                    "5. Remove the cluster-admin binding"
+                    "5. Remove the cluster-admin binding",
                 ],
                 "commands": [
                     "# List cluster-admin bindings",
                     "kubectl get clusterrolebindings -o json | jq '.items[] | select(.roleRef.name==\"cluster-admin\") | {name: .metadata.name, subjects: .subjects}'",
                     "",
                     "# Delete unnecessary cluster-admin binding",
-                    "kubectl delete clusterrolebinding BINDING_NAME"
+                    "kubectl delete clusterrolebinding BINDING_NAME",
                 ],
                 "yaml_example": """# Create a more restrictive role instead
 apiVersion: rbac.authorization.k8s.io/v1
@@ -500,7 +497,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["pods", "services"]
-  verbs: ["get", "list", "watch"]"""
+  verbs: ["get", "list", "watch"]""",
             }
         },
         "network_policy": {
@@ -510,11 +507,11 @@ rules:
                     "1. Identify the communication patterns for the namespace",
                     "2. Create a default-deny NetworkPolicy",
                     "3. Add specific allow rules for required traffic",
-                    "4. Test connectivity after applying policies"
+                    "4. Test connectivity after applying policies",
                 ],
                 "commands": [
                     "# Apply default deny policy",
-                    "kubectl apply -f - <<EOF\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-all\n  namespace: NAMESPACE\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\n  - Egress\nEOF"
+                    "kubectl apply -f - <<EOF\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-all\n  namespace: NAMESPACE\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\n  - Egress\nEOF",
                 ],
                 "yaml_example": """apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -525,9 +522,9 @@ spec:
   podSelector: {}
   policyTypes:
   - Ingress
-  - Egress"""
+  - Egress""",
             }
-        }
+        },
     }
 
     # Determine the remediation category
@@ -539,7 +536,9 @@ spec:
     remediation_data = None
 
     if finding_type == "vulnerability":
-        remediation_data = remediation_rules.get("vulnerability", {}).get(severity, remediation_rules["vulnerability"]["high"])
+        remediation_data = remediation_rules.get("vulnerability", {}).get(
+            severity, remediation_rules["vulnerability"]["high"]
+        )
     elif finding_type == "misconfiguration":
         if "privileged" in title_lower:
             remediation_data = remediation_rules["misconfiguration"]["privileged_container"]
@@ -559,14 +558,14 @@ spec:
                 "2. Assess the impact on your environment",
                 "3. Research best practices for this type of issue",
                 "4. Implement the recommended fix",
-                "5. Verify the fix and monitor for recurrence"
+                "5. Verify the fix and monitor for recurrence",
             ],
             "commands": [],
             "prevention": [
                 "Implement security scanning in your CI/CD pipeline",
                 "Follow Kubernetes security best practices",
-                "Regular security audits and reviews"
-            ]
+                "Regular security audits and reviews",
+            ],
         }
 
     return {
@@ -577,7 +576,7 @@ spec:
             "severity": request.severity,
             "title": request.title,
             "resource": f"{request.resource_type}/{request.resource_name}" if request.resource_type else None,
-            "namespace": request.namespace
+            "namespace": request.namespace,
         },
         "remediation": {
             "priority": remediation_data.get("priority", "MEDIUM"),
@@ -585,9 +584,9 @@ spec:
             "commands": remediation_data.get("commands", []),
             "yaml_example": remediation_data.get("yaml_example"),
             "prevention": remediation_data.get("prevention", []),
-            "generated_at": datetime.now().isoformat()
+            "generated_at": datetime.now().isoformat(),
         },
-        "note": "For more detailed AI-powered analysis, configure GOOGLE_API_KEY or GEMINI_API_KEY environment variable."
+        "note": "For more detailed AI-powered analysis, configure GOOGLE_API_KEY or GEMINI_API_KEY environment variable.",
     }
 
 
@@ -596,7 +595,7 @@ async def get_risky_namespaces(
     cluster_id: str = Query("default", description="Cluster ID"),
     limit: int = Query(10, description="Number of namespaces to return"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get namespaces with the most security issues.
@@ -607,7 +606,7 @@ async def get_risky_namespaces(
         dashboard = await security_service.get_security_dashboard(cluster_id)
         return {
             "risky_namespaces": dashboard.risky_namespaces[:limit],
-            "total_namespaces_analyzed": len(dashboard.risky_namespaces)
+            "total_namespaces_analyzed": len(dashboard.risky_namespaces),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get risky namespaces: {str(e)}")
@@ -617,7 +616,7 @@ async def get_risky_namespaces(
 async def get_security_recommendations(
     cluster_id: str = Query("default", description="Cluster ID"),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get actionable security recommendations.
@@ -629,7 +628,7 @@ async def get_security_recommendations(
         return {
             "recommendations": posture.recommendations,
             "security_score": posture.security_score.score,
-            "grade": posture.security_score.grade
+            "grade": posture.security_score.grade,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get recommendations: {str(e)}")
@@ -637,10 +636,11 @@ async def get_security_recommendations(
 
 # ============== RBAC Analysis Endpoints ==============
 
+
 @router.get("/rbac", response_model=RBACAnalysis)
 async def get_rbac_analysis(
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Analyze RBAC permissions for security risks.
@@ -662,7 +662,7 @@ async def get_rbac_analysis(
 @router.get("/rbac/summary")
 async def get_rbac_summary(
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get a quick summary of RBAC security status.
@@ -676,11 +676,17 @@ async def get_rbac_summary(
             "risky_role_bindings": analysis.risky_role_bindings,
             "cluster_admin_bindings": analysis.cluster_admin_bindings,
             "wildcard_permissions": analysis.wildcard_permissions,
-            "risk_level": "critical" if analysis.cluster_admin_bindings > 5 else
-                         "high" if analysis.cluster_admin_bindings > 2 else
-                         "medium" if analysis.risky_service_accounts > 5 else "low",
+            "risk_level": (
+                "critical"
+                if analysis.cluster_admin_bindings > 5
+                else (
+                    "high"
+                    if analysis.cluster_admin_bindings > 2
+                    else "medium" if analysis.risky_service_accounts > 5 else "low"
+                )
+            ),
             "recommendations": analysis.recommendations[:3],
-            "analyzed_at": analysis.analyzed_at
+            "analyzed_at": analysis.analyzed_at,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get RBAC summary: {str(e)}")
@@ -688,10 +694,11 @@ async def get_rbac_summary(
 
 # ============== Network Policy Endpoints ==============
 
+
 @router.get("/network-policies", response_model=NetworkPolicyCoverage)
 async def get_network_policy_coverage(
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Analyze network policy coverage across namespaces.
@@ -713,7 +720,7 @@ async def get_network_policy_coverage(
 @router.get("/network-policies/summary")
 async def get_network_policy_summary(
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get a quick summary of network policy coverage.
@@ -728,10 +735,13 @@ async def get_network_policy_summary(
             "total_pods": coverage.total_pods,
             "covered_pods": coverage.covered_pods,
             "coverage_percentage": round(coverage.coverage_percentage, 1),
-            "status": "good" if coverage.coverage_percentage >= 80 else
-                     "moderate" if coverage.coverage_percentage >= 50 else "poor",
+            "status": (
+                "good"
+                if coverage.coverage_percentage >= 80
+                else "moderate" if coverage.coverage_percentage >= 50 else "poor"
+            ),
             "recommendations": coverage.recommendations[:3],
-            "analyzed_at": coverage.analyzed_at
+            "analyzed_at": coverage.analyzed_at,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get network policy summary: {str(e)}")
@@ -739,11 +749,12 @@ async def get_network_policy_summary(
 
 # ============== Security Trends Endpoints ==============
 
+
 @router.get("/trends", response_model=SecurityTrends)
 async def get_security_trends(
     days: int = Query(30, description="Number of days of trend data", ge=1, le=90),
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get security trends over time.
@@ -764,7 +775,7 @@ async def get_security_trends(
 @router.get("/trends/summary")
 async def get_trends_summary(
     current_user: UserInfo = Depends(get_current_user),
-    security_service: SecurityService = Depends(get_security_service)
+    security_service: SecurityService = Depends(get_security_service),
 ):
     """
     Get a quick summary of security trends.
@@ -782,10 +793,13 @@ async def get_trends_summary(
             "vulnerabilities_fixed_7d": trends.vulnerabilities_fixed_7d,
             "vulnerabilities_new_7d": trends.vulnerabilities_new_7d,
             "trend_direction": trends.trend_direction,
-            "trend_icon": "arrow_up" if trends.trend_direction == "improving" else
-                         "arrow_down" if trends.trend_direction == "declining" else "minus",
+            "trend_icon": (
+                "arrow_up"
+                if trends.trend_direction == "improving"
+                else "arrow_down" if trends.trend_direction == "declining" else "minus"
+            ),
             "data_points": len(trends.trend_data),
-            "generated_at": trends.generated_at
+            "generated_at": trends.generated_at,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get trends summary: {str(e)}")

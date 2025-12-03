@@ -1,17 +1,22 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
 
-from app.services.kubernetes_service import kubernetes_service
-from app.services.k8s_deployment_service import k8s_deployment_service
-from app.services.gitflow_service import gitflow_service
-from app.schemas.selfservice import (
-    SelfServiceActionRequest, SelfServiceAction,
-    ServiceCatalogItem, EnvironmentInfo, QuickAction,
-    ActionType, ActionStatus
-)
+from fastapi import APIRouter, HTTPException, Query
+
 from app.schemas.gitflow import Environment
+from app.schemas.selfservice import (
+    ActionStatus,
+    ActionType,
+    EnvironmentInfo,
+    QuickAction,
+    SelfServiceAction,
+    SelfServiceActionRequest,
+    ServiceCatalogItem,
+)
+from app.services.gitflow_service import gitflow_service
+from app.services.k8s_deployment_service import k8s_deployment_service
+from app.services.kubernetes_service import kubernetes_service
 
 router = APIRouter()
 
@@ -20,10 +25,7 @@ _catalog: dict[str, ServiceCatalogItem] = {}
 
 
 @router.get("/catalog", response_model=List[ServiceCatalogItem])
-async def get_service_catalog(
-    namespace: Optional[str] = Query(None),
-    environment: Optional[str] = Query(None)
-):
+async def get_service_catalog(namespace: Optional[str] = Query(None), environment: Optional[str] = Query(None)):
     """Get the service catalog for self-service operations."""
     try:
         deployments = await kubernetes_service.get_deployments(namespace)
@@ -36,14 +38,9 @@ async def get_service_catalog(
                 environment=environment or "default",
                 description=f"Deployment with {dep.replicas} replicas",
                 current_version=dep.image.split(":")[-1] if dep.image and ":" in dep.image else "latest",
-                allowed_actions=[
-                    ActionType.DEPLOY,
-                    ActionType.ROLLBACK,
-                    ActionType.SCALE,
-                    ActionType.RESTART
-                ],
+                allowed_actions=[ActionType.DEPLOY, ActionType.ROLLBACK, ActionType.SCALE, ActionType.RESTART],
                 health_status="healthy" if dep.ready_replicas == dep.replicas else "degraded",
-                last_deployed=None
+                last_deployed=None,
             )
             services.append(service)
             _catalog[f"{dep.namespace}/{dep.name}"] = service
@@ -70,7 +67,7 @@ async def get_service(namespace: str, service_name: str):
                     environment="default",
                     current_version=dep.image.split(":")[-1] if dep.image and ":" in dep.image else "latest",
                     allowed_actions=[ActionType.DEPLOY, ActionType.ROLLBACK, ActionType.SCALE, ActionType.RESTART],
-                    health_status="healthy" if dep.ready_replicas == dep.replicas else "degraded"
+                    health_status="healthy" if dep.ready_replicas == dep.replicas else "degraded",
                 )
     except Exception:
         pass
@@ -92,14 +89,16 @@ async def get_environments():
 
             is_prod = any(kw in ns.name.lower() for kw in ["prod", "production", "live"])
 
-            environments.append(EnvironmentInfo(
-                name=ns.name,
-                cluster="default",
-                description=f"Namespace with {len(ns_pods)} pods",
-                is_production=is_prod,
-                services_count=len(set(p.name.rsplit("-", 2)[0] for p in ns_pods if "-" in p.name)),
-                health_status="healthy" if running == len(ns_pods) else "degraded"
-            ))
+            environments.append(
+                EnvironmentInfo(
+                    name=ns.name,
+                    cluster="default",
+                    description=f"Namespace with {len(ns_pods)} pods",
+                    is_production=is_prod,
+                    services_count=len(set(p.name.rsplit("-", 2)[0] for p in ns_pods if "-" in p.name)),
+                    health_status="healthy" if running == len(ns_pods) else "degraded",
+                )
+            )
 
         return environments
     except Exception as e:
@@ -117,7 +116,7 @@ async def get_quick_actions():
             action_type=ActionType.SCALE,
             icon="arrow-up",
             requires_confirmation=True,
-            parameters_schema={"namespace": "string", "deployment": "string"}
+            parameters_schema={"namespace": "string", "deployment": "string"},
         ),
         QuickAction(
             id="scale-down",
@@ -126,7 +125,7 @@ async def get_quick_actions():
             action_type=ActionType.SCALE,
             icon="arrow-down",
             requires_confirmation=True,
-            parameters_schema={"namespace": "string", "deployment": "string"}
+            parameters_schema={"namespace": "string", "deployment": "string"},
         ),
         QuickAction(
             id="restart",
@@ -135,7 +134,7 @@ async def get_quick_actions():
             action_type=ActionType.RESTART,
             icon="refresh",
             requires_confirmation=True,
-            parameters_schema={"namespace": "string", "deployment": "string"}
+            parameters_schema={"namespace": "string", "deployment": "string"},
         ),
         QuickAction(
             id="rollback",
@@ -144,8 +143,8 @@ async def get_quick_actions():
             action_type=ActionType.ROLLBACK,
             icon="undo",
             requires_confirmation=True,
-            parameters_schema={"namespace": "string", "deployment": "string", "version": "string?"}
-        )
+            parameters_schema={"namespace": "string", "deployment": "string", "version": "string?"},
+        ),
     ]
 
 
@@ -167,7 +166,7 @@ async def create_action(request: SelfServiceActionRequest):
         reason=request.reason,
         status=status,
         requested_by="self-service",
-        created_at=now
+        created_at=now,
     )
 
     _actions[action_id] = action
@@ -179,10 +178,7 @@ async def create_action(request: SelfServiceActionRequest):
 
 
 @router.get("/actions", response_model=List[SelfServiceAction])
-async def list_actions(
-    status: Optional[ActionStatus] = Query(None),
-    limit: int = Query(50, ge=1, le=200)
-):
+async def list_actions(status: Optional[ActionStatus] = Query(None), limit: int = Query(50, ge=1, le=200)):
     """List all self-service actions."""
     actions = list(_actions.values())
 
@@ -244,16 +240,13 @@ async def _execute_action(action: SelfServiceAction) -> SelfServiceAction:
         if action.action_type == ActionType.SCALE:
             replicas = action.parameters.get("replicas", 1)
             result = await kubernetes_service.scale_deployment(
-                namespace=action.target_namespace,
-                deployment_name=action.target_service,
-                replicas=replicas
+                namespace=action.target_namespace, deployment_name=action.target_service, replicas=replicas
             )
             action.result = result
 
         elif action.action_type == ActionType.RESTART:
             result = await kubernetes_service.restart_deployment(
-                namespace=action.target_namespace,
-                deployment_name=action.target_service
+                namespace=action.target_namespace, deployment_name=action.target_service
             )
             action.result = result
 
@@ -262,9 +255,7 @@ async def _execute_action(action: SelfServiceAction) -> SelfServiceAction:
             deployment_id = action.parameters.get("deployment_id")
             if deployment_id:
                 result = await k8s_deployment_service.rollback(
-                    deployment_id=deployment_id,
-                    target_version=target_version,
-                    reason=action.reason
+                    deployment_id=deployment_id, target_version=target_version, reason=action.reason
                 )
                 action.result = {"deployment_status": result.status}
 
@@ -277,7 +268,7 @@ async def _execute_action(action: SelfServiceAction) -> SelfServiceAction:
                     environment=Environment(action.target_environment),
                     namespace=action.target_namespace,
                     services=[action.target_service],
-                    image_registry=action.parameters.get("registry", "")
+                    image_registry=action.parameters.get("registry", ""),
                 )
                 action.result = {"deployment_id": result.id, "status": result.status}
 

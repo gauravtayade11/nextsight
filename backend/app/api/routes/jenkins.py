@@ -1,12 +1,17 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
+from typing import List, Optional
 
+from fastapi import APIRouter, HTTPException, Query
+
+from app.schemas.jenkins import (
+    BuildInfo,
+    BuildLogResponse,
+    JenkinsHealth,
+    JobInfo,
+    TriggerBuildRequest,
+    TriggerBuildResponse,
+)
 from app.services.jenkins_service import jenkins_service
 from app.services.timeline_service import timeline_service
-from app.schemas.jenkins import (
-    JobInfo, BuildInfo, BuildLogResponse, TriggerBuildRequest,
-    TriggerBuildResponse, JenkinsHealth
-)
 
 router = APIRouter()
 
@@ -52,12 +57,7 @@ async def get_build_log(job_name: str, build_number: int):
         truncated = len(log) > 100000
         if truncated:
             log = log[-100000:]
-        return BuildLogResponse(
-            job_name=job_name,
-            build_number=build_number,
-            log=log,
-            truncated=truncated
-        )
+        return BuildLogResponse(job_name=job_name, build_number=build_number, log=log, truncated=truncated)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -68,11 +68,7 @@ async def trigger_build(job_name: str, request: Optional[TriggerBuildRequest] = 
     try:
         parameters = request.parameters if request else {}
         queue_id = await jenkins_service.trigger_build(job_name, parameters)
-        return TriggerBuildResponse(
-            job_name=job_name,
-            queue_id=queue_id,
-            message=f"Build queued for {job_name}"
-        )
+        return TriggerBuildResponse(job_name=job_name, queue_id=queue_id, message=f"Build queued for {job_name}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

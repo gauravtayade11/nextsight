@@ -1,9 +1,11 @@
 """WebSocket connection manager for real-time features."""
+
 import asyncio
 import logging
-from typing import Dict
-from fastapi import WebSocket
 from dataclasses import dataclass
+from typing import Dict
+
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +13,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LogStreamConnection:
     """Represents a single log streaming connection."""
+
     websocket: WebSocket
     namespace: str
     pod_name: str
@@ -31,12 +34,7 @@ class WebSocketManager:
         return f"{id(websocket)}"
 
     async def connect(
-        self,
-        websocket: WebSocket,
-        namespace: str,
-        pod_name: str,
-        container: str,
-        timestamps: bool = False
+        self, websocket: WebSocket, namespace: str, pod_name: str, container: str, timestamps: bool = False
     ) -> str:
         """Accept a new WebSocket connection."""
         await websocket.accept()
@@ -44,11 +42,7 @@ class WebSocketManager:
 
         async with self._lock:
             self._connections[connection_id] = LogStreamConnection(
-                websocket=websocket,
-                namespace=namespace,
-                pod_name=pod_name,
-                container=container,
-                timestamps=timestamps
+                websocket=websocket, namespace=namespace, pod_name=pod_name, container=container, timestamps=timestamps
             )
 
         logger.info(f"WebSocket connected: {connection_id} for {namespace}/{pod_name}/{container}")
@@ -75,10 +69,7 @@ class WebSocketManager:
 
         if conn:
             try:
-                await conn.websocket.send_json({
-                    "type": "log",
-                    "content": log_line
-                })
+                await conn.websocket.send_json({"type": "log", "content": log_line})
             except Exception as e:
                 logger.error(f"Error sending log to {connection_id}: {e}")
                 await self.disconnect(connection_id)
@@ -90,11 +81,7 @@ class WebSocketManager:
 
         if conn:
             try:
-                await conn.websocket.send_json({
-                    "type": "status",
-                    "status": status,
-                    "message": message
-                })
+                await conn.websocket.send_json({"type": "status", "status": status, "message": message})
             except Exception as e:
                 logger.error(f"Error sending status to {connection_id}: {e}")
 
@@ -105,11 +92,7 @@ class WebSocketManager:
 
         if conn:
             try:
-                await conn.websocket.send_json({
-                    "type": "error",
-                    "error": error,
-                    "code": code
-                })
+                await conn.websocket.send_json({"type": "error", "error": error, "code": code})
             except Exception as e:
                 logger.error(f"Error sending error to {connection_id}: {e}")
 

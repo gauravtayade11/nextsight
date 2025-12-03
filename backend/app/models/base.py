@@ -1,9 +1,10 @@
+import uuid
 from datetime import datetime
 from typing import Optional
+
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
-import uuid
 
 
 class Base(DeclarativeBase):
