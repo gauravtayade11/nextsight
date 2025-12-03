@@ -405,8 +405,6 @@ class SecurityService:
         Args:
             force_scan: If True, bypass cache and force a fresh scan
         """
-        global _scan_cache, _failed_images
-
         cache_key = "container_images_scan"
 
         # Check cache first (unless force_scan is True)
@@ -470,8 +468,6 @@ class SecurityService:
 
     async def _scan_image_with_trivy(self, image: str) -> Optional[ImageScanResult]:
         """Scan a single image with Trivy."""
-        global _trivy_semaphore, _failed_images
-
         # Use semaphore to limit concurrent scans
         async with _trivy_semaphore:
             try:
@@ -1230,8 +1226,6 @@ class SecurityService:
 
     async def get_security_trends(self, days: int = 30) -> SecurityTrends:
         """Get security trends over time."""
-        global _security_trends_history
-
         from datetime import timedelta
 
         now = datetime.utcnow()
