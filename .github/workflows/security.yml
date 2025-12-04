@@ -127,11 +127,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-  # OSSF Scorecard
+  # OSSF Scorecard - Only runs on main branch (default branch requirement)
   scorecard:
     name: OSSF Scorecard
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
 
     steps:
       - name: Checkout code

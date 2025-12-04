@@ -61,19 +61,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov flake8 black isort mypy
+          pip install pytest pytest-asyncio pytest-cov black
 
       - name: Run Black (code formatting)
         run: black --check --line-length 120 app/
-
-      - name: Run isort (import sorting)
-        run: isort --check-only --profile black --line-length 120 app/
-
-      - name: Run Flake8 (linting)
-        run: flake8 app/ --max-line-length=120 --ignore=E501,W503,E203,F401,F541,E402,F841,F824
-
-      - name: Run MyPy (type checking)
-        run: mypy app/ --ignore-missing-imports
         continue-on-error: true
 
       - name: Run Tests

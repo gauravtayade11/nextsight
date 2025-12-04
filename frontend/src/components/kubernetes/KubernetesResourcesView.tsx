@@ -1,5 +1,10 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Terminal } from 'xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import 'xterm/css/xterm.css';
 import {
   GlobeAltIcon,
   CircleStackIcon,
@@ -10,6 +15,7 @@ import {
   ClockIcon,
   CalendarIcon,
   ArrowsPointingOutIcon,
+  ArrowsPointingInIcon,
   ArrowPathIcon,
   CubeIcon,
   Cog6ToothIcon,
@@ -27,10 +33,17 @@ import {
   XMarkIcon,
   ClipboardDocumentIcon,
   CheckIcon,
+  ArrowUturnLeftIcon,
+  CommandLineIcon,
+  SignalIcon,
+  SignalSlashIcon,
+  WrenchScrewdriverIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { kubernetesApi } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import GlassCard from '../common/GlassCard';
+import PodLogsViewer from './PodLogsViewer';
 import type {
   Namespace,
   K8sService,
@@ -72,6 +85,835 @@ const tableRowVariants = {
   }),
 };
 
+// ==================== REUSABLE MODAL COMPONENTS ====================
+
+// Reusable Scale Modal Component with React Portal
+interface ScaleModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  resourceName: string;
+  resourceType: string;
+  namespace: string;
+  currentReplicas: number;
+  onScale: (replicas: number) => Promise<void>;
+  isLoading: boolean;
+}
+
+function ScaleModal({ isOpen, onClose, resourceName, resourceType, namespace, currentReplicas, onScale, isLoading }: ScaleModalProps) {
+  const [replicas, setReplicas] = useState(currentReplicas);
+
+  useEffect(() => {
+    setReplicas(currentReplicas);
+  }, [currentReplicas, isOpen]);
+
+  // Keyboard shortcut: Escape to close
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 border border-gray-200 dark:border-slate-700"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-xl bg-primary-100 dark:bg-primary-900/30">
+            <ScaleIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Scale {resourceType}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {resourceName} in {namespace}
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Number of Replicas
+          </label>
+          <div className="flex items-center justify-center gap-4">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setReplicas(Math.max(0, replicas - 1))}
+              className="p-3 rounded-xl bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+            >
+              <StopIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            </motion.button>
+            <input
+              type="number"
+              min="0"
+              value={replicas}
+              onChange={(e) => setReplicas(parseInt(e.target.value) || 0)}
+              className="w-24 text-center text-2xl font-bold px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:border-primary-500 focus:ring-0 transition-colors"
+            />
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setReplicas(replicas + 1)}
+              className="p-3 rounded-xl bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+            >
+              <PlayIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            </motion.button>
+          </div>
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Current: {currentReplicas} → New: {replicas}
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+          >
+            Cancel
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onScale(replicas)}
+            disabled={isLoading || replicas === currentReplicas}
+            className="px-5 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg shadow-primary-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                Scaling...
+              </span>
+            ) : (
+              'Scale'
+            )}
+          </motion.button>
+        </div>
+
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">
+          Press Esc to cancel
+        </p>
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+}
+
+// Rollback Modal Component with version history
+interface RollbackModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  deployment: Deployment;
+  onRollback: (revision: number) => Promise<void>;
+  isLoading: boolean;
+}
+
+interface RevisionInfo {
+  revision: number;
+  changeReason: string;
+  image?: string;
+}
+
+function RollbackModal({ isOpen, onClose, deployment, onRollback, isLoading }: RollbackModalProps) {
+  const [revisions, setRevisions] = useState<RevisionInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchRevisions();
+    }
+  }, [isOpen, deployment]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const fetchRevisions = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await kubernetesApi.executeKubectl({
+        command: `rollout history deployment ${deployment.name} -n ${deployment.namespace}`,
+      });
+
+      // Parse the rollout history output
+      const lines = result.data.stdout?.split('\n') || [];
+      const parsedRevisions: RevisionInfo[] = [];
+
+      for (const line of lines) {
+        // Match lines like "1         <none>" or "2         kubectl set image..."
+        const match = line.match(/^\s*(\d+)\s+(.*)$/);
+        if (match) {
+          parsedRevisions.push({
+            revision: parseInt(match[1], 10),
+            changeReason: match[2].trim() || '<none>',
+          });
+        }
+      }
+
+      setRevisions(parsedRevisions.reverse()); // Show newest first
+      if (parsedRevisions.length > 1) {
+        setSelectedRevision(parsedRevisions[parsedRevisions.length - 2]?.revision); // Select previous revision by default
+      }
+    } catch (err) {
+      setError('Failed to fetch revision history');
+      console.error('Failed to fetch revisions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 border border-gray-200 dark:border-slate-700"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/30">
+            <ArrowUturnLeftIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Rollback Deployment
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {deployment.name} in {deployment.namespace}
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <ArrowPathIcon className="h-6 w-6 animate-spin text-gray-400" />
+            <span className="ml-2 text-gray-500">Loading revision history...</span>
+          </div>
+        ) : error ? (
+          <div className="py-4 text-center text-danger-600 dark:text-danger-400">
+            {error}
+          </div>
+        ) : revisions.length <= 1 ? (
+          <div className="py-4 text-center text-gray-500 dark:text-gray-400">
+            No previous revisions available for rollback
+          </div>
+        ) : (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Revision to Rollback
+              </label>
+              <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-slate-600 rounded-xl p-2">
+                {revisions.map((rev, idx) => (
+                  <button
+                    key={rev.revision}
+                    onClick={() => setSelectedRevision(rev.revision)}
+                    disabled={idx === 0} // Can't rollback to current
+                    className={`w-full text-left p-3 rounded-lg transition-all ${
+                      selectedRevision === rev.revision
+                        ? 'bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-500'
+                        : idx === 0
+                        ? 'bg-gray-50 dark:bg-slate-700/50 opacity-50 cursor-not-allowed'
+                        : 'bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 border-2 border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Rev {rev.revision}
+                        </span>
+                        {idx === 0 && (
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate font-mono">
+                      {rev.changeReason}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => selectedRevision && onRollback(selectedRevision)}
+                disabled={isLoading || !selectedRevision}
+                className="px-5 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 transition-all shadow-lg shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                    Rolling back...
+                  </span>
+                ) : (
+                  `Rollback to Rev ${selectedRevision}`
+                )}
+              </motion.button>
+            </div>
+          </>
+        )}
+
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">
+          Press Esc to cancel
+        </p>
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+}
+
+// Pod Exec Modal Component - Interactive Terminal with xterm.js
+interface PodExecModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pod: Pod;
+}
+
+function PodExecModal({ isOpen, onClose, pod }: PodExecModalProps) {
+  const toast = useToast();
+  const [selectedContainer, setSelectedContainer] = useState<string>('');
+  const [selectedShell, setSelectedShell] = useState<string>('/bin/sh');
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isDistroless, setIsDistroless] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugImage, setDebugImage] = useState('busybox:latest');
+
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const shellFailCountRef = useRef(0);
+
+  const shells = ['/bin/bash', '/bin/sh', '/bin/ash', '/bin/zsh'];
+  const debugImages = [
+    { value: 'busybox:latest', label: 'BusyBox (minimal)' },
+    { value: 'alpine:latest', label: 'Alpine (with apk)' },
+    { value: 'nicolaka/netshoot:latest', label: 'Netshoot (network debug)' },
+    { value: 'ubuntu:latest', label: 'Ubuntu (full)' },
+  ];
+
+  // Initialize container selection and reset debug state
+  useEffect(() => {
+    if (isOpen && pod.containers && pod.containers.length > 0) {
+      setSelectedContainer(pod.containers[0]);
+      // Reset debug state when modal opens
+      setIsDistroless(false);
+      setDebugMode(false);
+      shellFailCountRef.current = 0;
+    }
+  }, [isOpen, pod]);
+
+  // Initialize xterm.js terminal
+  useEffect(() => {
+    if (!isOpen || !terminalRef.current) return;
+
+    // Create terminal instance
+    const terminal = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      theme: {
+        background: '#1e293b',
+        foreground: '#e2e8f0',
+        cursor: '#22c55e',
+        cursorAccent: '#1e293b',
+        selectionBackground: '#334155',
+        black: '#1e293b',
+        red: '#ef4444',
+        green: '#22c55e',
+        yellow: '#eab308',
+        blue: '#3b82f6',
+        magenta: '#a855f7',
+        cyan: '#06b6d4',
+        white: '#e2e8f0',
+        brightBlack: '#475569',
+        brightRed: '#f87171',
+        brightGreen: '#4ade80',
+        brightYellow: '#facc15',
+        brightBlue: '#60a5fa',
+        brightMagenta: '#c084fc',
+        brightCyan: '#22d3ee',
+        brightWhite: '#f8fafc',
+      },
+      allowTransparency: true,
+      scrollback: 10000,
+    });
+
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon();
+
+    terminal.loadAddon(fitAddon);
+    terminal.loadAddon(webLinksAddon);
+
+    terminal.open(terminalRef.current);
+    fitAddon.fit();
+
+    xtermRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+
+    terminal.writeln('\x1b[1;32m┌──────────────────────────────────────────┐\x1b[0m');
+    terminal.writeln('\x1b[1;32m│\x1b[0m  \x1b[1;36mNexOps Pod Terminal\x1b[0m                     \x1b[1;32m│\x1b[0m');
+    terminal.writeln('\x1b[1;32m└──────────────────────────────────────────┘\x1b[0m');
+    terminal.writeln('');
+    terminal.writeln(`\x1b[90mPod:\x1b[0m ${pod.name}`);
+    terminal.writeln(`\x1b[90mNamespace:\x1b[0m ${pod.namespace}`);
+    terminal.writeln('');
+    terminal.writeln('\x1b[33mConnecting...\x1b[0m');
+
+    // Handle window resize
+    const handleResize = () => {
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+        // Send resize to WebSocket
+        if (wsRef.current?.readyState === WebSocket.OPEN && xtermRef.current) {
+          wsRef.current.send(JSON.stringify({
+            type: 'resize',
+            cols: xtermRef.current.cols,
+            rows: xtermRef.current.rows,
+          }));
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      terminal.dispose();
+      xtermRef.current = null;
+      fitAddonRef.current = null;
+    };
+  }, [isOpen, pod.name, pod.namespace]);
+
+  // Track if initial connection was made
+  const hasConnectedRef = useRef(false);
+  const connectionStatusRef = useRef(connectionStatus);
+  connectionStatusRef.current = connectionStatus;
+
+  // Connect WebSocket - stable function that doesn't change
+  const connectWebSocket = useCallback(() => {
+    if (!xtermRef.current || !selectedContainer) return;
+
+    const terminal = xtermRef.current;
+
+    // Close existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    setConnectionStatus('connecting');
+
+    // Build WebSocket URL - use debug endpoint if debug mode is enabled
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let wsUrl: string;
+
+    if (debugMode) {
+      wsUrl = `${protocol}//${window.location.host}/api/v1/ws/pods/${pod.namespace}/${pod.name}/debug?container=${selectedContainer}&image=${encodeURIComponent(debugImage)}&target_container=${selectedContainer}`;
+      terminal.writeln('');
+      terminal.writeln(`\x1b[1;35m🔧 Debug Mode\x1b[0m`);
+      terminal.writeln(`\x1b[90mAttaching debug container (${debugImage}) to ${selectedContainer}...\x1b[0m`);
+    } else {
+      wsUrl = `${protocol}//${window.location.host}/api/v1/ws/pods/${pod.namespace}/${pod.name}/exec?container=${selectedContainer}&shell=${encodeURIComponent(selectedShell)}`;
+      terminal.writeln('');
+      terminal.writeln(`\x1b[90mConnecting to ${selectedContainer} with ${selectedShell}...\x1b[0m`);
+    }
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    let inputHandler: { dispose: () => void } | null = null;
+    let outputBuffer = '';
+
+    ws.onopen = () => {
+      setConnectionStatus('connected');
+      terminal.writeln('\x1b[32m✓ Connected\x1b[0m');
+      terminal.writeln('');
+
+      // Send initial resize
+      ws.send(JSON.stringify({
+        type: 'resize',
+        cols: terminal.cols,
+        rows: terminal.rows,
+      }));
+
+      // Handle terminal input only after connection
+      inputHandler = terminal.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'input', data }));
+        }
+      });
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'output') {
+          terminal.write(data.data);
+          outputBuffer += data.data;
+
+          // Detect shell not found errors (distroless container)
+          if (!debugMode && (
+            outputBuffer.includes('executable file not found') ||
+            outputBuffer.includes('OCI runtime exec failed') ||
+            outputBuffer.includes('no such file or directory') ||
+            outputBuffer.includes('exit code 127')
+          )) {
+            shellFailCountRef.current++;
+
+            // If all shells have failed, this is likely a distroless container
+            if (shellFailCountRef.current >= shells.length) {
+              setIsDistroless(true);
+              terminal.writeln('');
+              terminal.writeln('\x1b[1;33m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+              terminal.writeln('\x1b[1;33m⚠  Distroless Container Detected\x1b[0m');
+              terminal.writeln('\x1b[90m   This container has no shell or standard tools.\x1b[0m');
+              terminal.writeln('\x1b[90m   Use the "Debug Container" mode to attach a debug pod.\x1b[0m');
+              terminal.writeln('\x1b[1;33m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+              terminal.writeln('');
+            }
+          }
+        } else if (data.type === 'status') {
+          if (data.status === 'disconnected') {
+            terminal.writeln('');
+            terminal.writeln('\x1b[33m⚠ Session ended\x1b[0m');
+            setConnectionStatus('disconnected');
+          }
+        } else if (data.type === 'error') {
+          terminal.writeln('');
+          terminal.writeln(`\x1b[31m✗ Error: ${data.error}\x1b[0m`);
+          setConnectionStatus('error');
+        }
+      } catch {
+        // Raw text output
+        terminal.write(event.data);
+      }
+    };
+
+    ws.onerror = () => {
+      terminal.writeln('');
+      terminal.writeln('\x1b[31m✗ Connection error\x1b[0m');
+      setConnectionStatus('error');
+    };
+
+    ws.onclose = () => {
+      // Only update to disconnected if not already in error state
+      setConnectionStatus(prev => prev === 'error' ? 'error' : 'disconnected');
+    };
+
+    return () => {
+      if (inputHandler) {
+        inputHandler.dispose();
+      }
+    };
+  }, [selectedContainer, selectedShell, debugMode, debugImage, pod.namespace, pod.name, shells.length]);
+
+  // Connect when modal opens and container is selected (only once per open)
+  useEffect(() => {
+    if (isOpen && selectedContainer && xtermRef.current && !hasConnectedRef.current) {
+      hasConnectedRef.current = true;
+      connectWebSocket();
+    }
+
+    // Reset when modal closes
+    if (!isOpen) {
+      hasConnectedRef.current = false;
+    }
+  }, [isOpen, selectedContainer, connectWebSocket]);
+
+  // Reconnect when shell changes (user manually changes)
+  const handleShellChange = (shell: string) => {
+    setSelectedShell(shell);
+    // Will reconnect in next effect
+    setTimeout(() => {
+      if (xtermRef.current) {
+        connectWebSocket();
+      }
+    }, 100);
+  };
+
+  // Fit terminal when expanded state changes
+  useEffect(() => {
+    if (fitAddonRef.current) {
+      setTimeout(() => {
+        fitAddonRef.current?.fit();
+      }, 300);
+    }
+  }, [isExpanded]);
+
+  // Handle escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const handleContainerChange = (container: string) => {
+    setSelectedContainer(container);
+    // Reconnect with new container
+    setTimeout(() => {
+      if (xtermRef.current) {
+        connectWebSocket();
+      }
+    }, 100);
+  };
+
+  const handleReconnect = () => {
+    connectWebSocket();
+  };
+
+  const copyExecCommand = () => {
+    const containerFlag = selectedContainer ? `-c ${selectedContainer}` : '';
+    const cmd = `kubectl exec -it ${pod.name} -n ${pod.namespace} ${containerFlag} -- ${selectedShell}`;
+    navigator.clipboard.writeText(cmd);
+    toast.success('Command copied', 'Exec command copied to clipboard');
+  };
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className={`fixed top-16 right-0 bottom-0 z-[9999] flex flex-col bg-slate-900 shadow-2xl border-l border-slate-700 ${
+        isExpanded ? 'w-full left-0' : 'w-[55%] min-w-[600px]'
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-green-900/30">
+            <CommandLineIcon className="h-5 w-5 text-green-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-gray-100">Terminal</h2>
+              <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                connectionStatus === 'connected' ? 'bg-green-900/50 text-green-400' :
+                connectionStatus === 'connecting' ? 'bg-yellow-900/50 text-yellow-400' :
+                connectionStatus === 'error' ? 'bg-red-900/50 text-red-400' :
+                'bg-gray-700 text-gray-400'
+              }`}>
+                {connectionStatus === 'connected' ? <SignalIcon className="h-3 w-3" /> : <SignalSlashIcon className="h-3 w-3" />}
+                {connectionStatus}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400">{pod.name}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {connectionStatus !== 'connected' && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleReconnect}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+            >
+              Reconnect
+            </motion.button>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={copyExecCommand}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700 text-gray-300 hover:bg-slate-600 transition-colors"
+          >
+            Copy Command
+          </motion.button>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 hover:bg-slate-700 rounded-lg"
+            title={isExpanded ? 'Collapse' : 'Expand'}
+          >
+            {isExpanded ? (
+              <ArrowsPointingInIcon className="h-4 w-4 text-gray-400" />
+            ) : (
+              <ArrowsPointingOutIcon className="h-4 w-4 text-gray-400" />
+            )}
+          </button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg">
+            <XMarkIcon className="h-4 w-4 text-gray-400" />
+          </button>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-700 bg-slate-800/50 flex-wrap">
+        {pod.containers && pod.containers.length > 1 && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-400">Container:</label>
+            <select
+              value={selectedContainer}
+              onChange={(e) => handleContainerChange(e.target.value)}
+              className="px-2 py-1 text-xs rounded border border-slate-600 bg-slate-700 text-gray-100"
+            >
+              {pod.containers.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Debug Mode Toggle */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setDebugMode(!debugMode);
+              shellFailCountRef.current = 0;
+              setIsDistroless(false);
+              setTimeout(() => connectWebSocket(), 100);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
+              debugMode
+                ? 'bg-purple-600 text-white'
+                : isDistroless
+                ? 'bg-yellow-600 text-white animate-pulse'
+                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+            }`}
+          >
+            <WrenchScrewdriverIcon className="h-3.5 w-3.5" />
+            Debug Container
+          </button>
+        </div>
+
+        {debugMode ? (
+          /* Debug Image Selector */
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-400">Image:</label>
+            <select
+              value={debugImage}
+              onChange={(e) => {
+                setDebugImage(e.target.value);
+                setTimeout(() => connectWebSocket(), 100);
+              }}
+              className="px-2 py-1 text-xs rounded border border-slate-600 bg-slate-700 text-gray-100"
+            >
+              {debugImages.map((img) => (
+                <option key={img.value} value={img.value}>{img.label}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          /* Shell Selector */
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-400">Shell:</label>
+            <select
+              value={selectedShell}
+              onChange={(e) => handleShellChange(e.target.value)}
+              className="px-2 py-1 text-xs rounded border border-slate-600 bg-slate-700 text-gray-100"
+            >
+              {shells.map((shell) => (
+                <option key={shell} value={shell}>{shell}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Distroless warning indicator */}
+        {isDistroless && !debugMode && (
+          <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-lg bg-yellow-900/50 text-yellow-400">
+            <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+            No shell available
+          </div>
+        )}
+      </div>
+
+      {/* Terminal */}
+      <div className="flex-1 p-2 overflow-hidden">
+        <div
+          ref={terminalRef}
+          className="h-full w-full rounded-lg overflow-hidden"
+          style={{ backgroundColor: '#1e293b' }}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-2 border-t border-slate-700 bg-slate-800/50 flex items-center justify-between">
+        <p className="text-xs text-gray-500">
+          {debugMode ? (
+            <>
+              <span className="text-purple-400">Debug Mode</span> • Ephemeral container attached with process namespace sharing
+            </>
+          ) : (
+            <>Press Esc to close • Ctrl+C to interrupt</>
+          )}
+        </p>
+        {debugMode && (
+          <span className="text-xs text-purple-400 flex items-center gap-1">
+            <WrenchScrewdriverIcon className="h-3 w-3" />
+            {debugImage}
+          </span>
+        )}
+      </div>
+    </motion.div>,
+    document.body
+  );
+}
+
 type CategoryType = 'workloads' | 'networking' | 'config' | 'storage' | 'scaling';
 type WorkloadTab = 'deployments' | 'pods' | 'statefulsets' | 'daemonsets' | 'jobs' | 'cronjobs';
 type NetworkTab = 'services' | 'ingresses';
@@ -104,6 +946,14 @@ const configTabs: { id: ConfigTab; label: string; icon: typeof DocumentDuplicate
   { id: 'secrets', label: 'Secrets', icon: KeyIcon },
 ];
 
+// Auto-refresh interval options
+const autoRefreshOptions = [
+  { value: 0, label: 'Off' },
+  { value: 15, label: '15s' },
+  { value: 30, label: '30s' },
+  { value: 60, label: '1m' },
+];
+
 export default function KubernetesResourcesView() {
   const [activeCategory, setActiveCategory] = useState<CategoryType>('workloads');
   const [activeWorkloadTab, setActiveWorkloadTab] = useState<WorkloadTab>('deployments');
@@ -113,6 +963,8 @@ export default function KubernetesResourcesView() {
   const [namespaces, setNamespaces] = useState<Namespace[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(0);
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Workload states
   const [deployments, setDeployments] = useState<Deployment[]>([]);
@@ -260,6 +1112,26 @@ export default function KubernetesResourcesView() {
     }
   }
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (autoRefreshTimerRef.current) {
+      clearInterval(autoRefreshTimerRef.current);
+      autoRefreshTimerRef.current = null;
+    }
+
+    if (autoRefreshInterval > 0) {
+      autoRefreshTimerRef.current = setInterval(() => {
+        fetchResourceData();
+      }, autoRefreshInterval * 1000);
+    }
+
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current);
+      }
+    };
+  }, [autoRefreshInterval, selectedNamespace, activeCategory, activeWorkloadTab, activeNetworkTab, activeConfigTab]);
+
   function renderSubTabs() {
     const renderTabGroup = (
       tabs: { id: string; label: string; icon: typeof CubeIcon }[],
@@ -316,7 +1188,7 @@ export default function KubernetesResourcesView() {
         case 'pods':
           return <PodsTable data={pods} searchQuery={searchQuery} />;
         case 'statefulsets':
-          return <StatefulSetsTable data={statefulSets} searchQuery={searchQuery} />;
+          return <StatefulSetsTable data={statefulSets} searchQuery={searchQuery} onRefresh={fetchResourceData} />;
         case 'daemonsets':
           return <DaemonSetsTable data={daemonSets} searchQuery={searchQuery} />;
         case 'jobs':
@@ -362,16 +1234,25 @@ export default function KubernetesResourcesView() {
       animate="visible"
       className="space-y-6"
     >
-      {/* Header */}
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 dark:from-white dark:via-gray-200 dark:to-white bg-clip-text text-transparent">
-            Kubernetes Resources
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Manage and monitor cluster resources
-          </p>
-        </div>
+      {/* Sticky Header */}
+      <motion.div
+        variants={itemVariants}
+        className="sticky top-16 z-30 -mx-4 lg:-mx-8 px-4 lg:px-8 py-4 bg-gray-50/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-gray-200/50 dark:border-slate-700/50"
+      >
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary-100 dark:bg-primary-900/30">
+              <CubeIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+                Kubernetes Resources
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                Manage cluster resources
+              </p>
+            </div>
+          </div>
         <div className="flex flex-wrap gap-3">
           {/* Search Input */}
           <div className="relative">
@@ -403,16 +1284,45 @@ export default function KubernetesResourcesView() {
               </svg>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={fetchResourceData}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 disabled:opacity-50"
-          >
-            <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </motion.button>
+          {/* Auto-Refresh Toggle */}
+          <div className="flex items-center gap-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-slate-600/50 p-1">
+            {autoRefreshOptions.map((option) => (
+              <motion.button
+                key={option.value}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setAutoRefreshInterval(option.value)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  autoRefreshInterval === option.value
+                    ? 'bg-primary-500 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                {option.label}
+              </motion.button>
+            ))}
+          </div>
+
+          {/* Refresh Button with Last Updated */}
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={fetchResourceData}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </motion.button>
+            {autoRefreshInterval > 0 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-success-500 rounded-full animate-pulse" />
+                Auto
+              </span>
+            )}
+          </div>
+        </div>
         </div>
       </motion.div>
 
@@ -638,7 +1548,10 @@ function sortData<T>(data: T[], sortConfig: SortConfig<T>): T[] {
   });
 }
 
-// YAML Modal Component
+// Simple YAML display - no syntax highlighting to avoid HTML escaping issues
+// The YAML content is displayed with proper monospace styling
+
+// YAML Panel Component (slide-in panel)
 function YAMLModal({
   isOpen,
   onClose,
@@ -656,6 +1569,19 @@ function YAMLModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showLineNumbers, setShowLineNumbers] = useState(true);
+
+  // Keyboard shortcut: Escape to close
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -695,23 +1621,22 @@ function YAMLModal({
 
   if (!isOpen) return null;
 
-  return (
+  const lines = yaml.split('\n');
+
+  // Use React Portal to render slide-in panel at document.body level
+  // Position below the main header (top-16 = 64px)
+  return createPortal(
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={onClose}
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className={`fixed top-16 right-0 bottom-0 z-[9999] flex flex-col bg-white dark:bg-slate-800 shadow-2xl border-l border-gray-200 dark:border-slate-700 ${
+        isExpanded ? 'w-full left-0' : 'w-[55%] min-w-[600px]'
+      }`}
     >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden"
-      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-gray-100 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary-100 dark:bg-primary-900/30">
               <CodeBracketIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -726,6 +1651,17 @@ function YAMLModal({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Line numbers toggle */}
+            <button
+              onClick={() => setShowLineNumbers(!showLineNumbers)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                showLineNumbers
+                  ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              Line #
+            </button>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -745,9 +1681,22 @@ function YAMLModal({
                 </>
               )}
             </motion.button>
+            {/* Expand/Collapse button */}
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              title={isExpanded ? 'Collapse panel' : 'Expand to full screen'}
+            >
+              {isExpanded ? (
+                <ArrowsPointingInIcon className="h-5 w-5" />
+              ) : (
+                <ArrowsPointingOutIcon className="h-5 w-5" />
+              )}
+            </button>
             <button
               onClick={onClose}
               className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              title="Close (Esc)"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
@@ -755,16 +1704,16 @@ function YAMLModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-hidden p-4">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-full">
               <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                 <ArrowPathIcon className="h-5 w-5 animate-spin" />
                 <span>Loading YAML...</span>
               </div>
             </div>
           ) : error ? (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-danger-500 dark:text-danger-400 font-medium">{error}</p>
                 <button
@@ -776,13 +1725,32 @@ function YAMLModal({
               </div>
             </div>
           ) : (
-            <pre className="text-sm font-mono text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-slate-900 p-4 rounded-xl overflow-auto whitespace-pre-wrap">
-              {yaml}
-            </pre>
+            <div className="h-full bg-gray-50 dark:bg-slate-900 rounded-xl overflow-auto">
+              <div className="flex text-xs font-mono">
+                {/* Line numbers */}
+                {showLineNumbers && (
+                  <div className="flex-shrink-0 py-4 pl-4 pr-2 text-right text-gray-400 dark:text-gray-600 select-none border-r border-gray-200 dark:border-slate-700">
+                    {lines.map((_, i) => (
+                      <div key={i} className="leading-5">{i + 1}</div>
+                    ))}
+                  </div>
+                )}
+                {/* YAML content */}
+                <pre className="flex-1 py-4 px-4 text-gray-800 dark:text-gray-200 overflow-x-auto whitespace-pre leading-5">
+                  {yaml}
+                </pre>
+              </div>
+            </div>
           )}
         </div>
-      </motion.div>
-    </motion.div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-2 border-t border-gray-100 dark:border-slate-700 text-xs text-gray-500 dark:text-gray-400">
+          <span>{lines.length} lines</span>
+          <span>Press Esc to close</span>
+        </div>
+    </motion.div>,
+    document.body
   );
 }
 
@@ -802,6 +1770,7 @@ function DeploymentsTable({ data, searchQuery, onRefresh }: { data: Deployment[]
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<SortConfig<Deployment>>({ key: null, direction: null });
   const [yamlModal, setYamlModal] = useState<{ namespace: string; name: string } | null>(null);
+  const [rollbackModal, setRollbackModal] = useState<Deployment | null>(null);
 
   // Filter by search query
   const searchFiltered = data.filter(dep =>
@@ -852,6 +1821,23 @@ function DeploymentsTable({ data, searchQuery, onRefresh }: { data: Deployment[]
     } catch (error) {
       toast.error('Restart failed', `Failed to restart ${dep.name}`);
       console.error('Failed to restart deployment:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRollback = async (dep: Deployment, revision: number) => {
+    setActionLoading(`rollback-${dep.namespace}-${dep.name}`);
+    try {
+      await kubernetesApi.executeKubectl({
+        command: `rollout undo deployment ${dep.name} -n ${dep.namespace} --to-revision=${revision}`,
+      });
+      toast.success('Rollback initiated', `${dep.name} is rolling back to revision ${revision}`);
+      onRefresh();
+      setRollbackModal(null);
+    } catch (error) {
+      toast.error('Rollback failed', `Failed to rollback ${dep.name}`);
+      console.error('Failed to rollback deployment:', error);
     } finally {
       setActionLoading(null);
     }
@@ -955,6 +1941,20 @@ function DeploymentsTable({ data, searchQuery, onRefresh }: { data: Deployment[]
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
+                            onClick={() => setRollbackModal(dep)}
+                            disabled={actionLoading === `rollback-${dep.namespace}-${dep.name}`}
+                            className="p-2 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
+                            title="Rollback to specific revision"
+                          >
+                            {actionLoading === `rollback-${dep.namespace}-${dep.name}` ? (
+                              <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ArrowUturnLeftIcon className="h-4 w-4" />
+                            )}
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => setYamlModal({ namespace: dep.namespace, name: dep.name })}
                             className="p-2 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                             title="View YAML"
@@ -1001,17 +2001,22 @@ function DeploymentsTable({ data, searchQuery, onRefresh }: { data: Deployment[]
                                   </div>
                                 </div>
                                 <div className="space-y-2">
-                                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quick Actions</h4>
-                                  <div className="flex gap-2">
-                                    <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors">
-                                      View Pods
-                                    </button>
-                                    <button
-                                      onClick={() => setYamlModal({ namespace: dep.namespace, name: dep.name })}
-                                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-                                    >
-                                      View YAML
-                                    </button>
+                                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Replica Status</h4>
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">Desired:</span>
+                                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{dep.replicas}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">Ready:</span>
+                                      <span className={`text-sm font-semibold ${dep.ready_replicas === dep.replicas ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400'}`}>
+                                        {dep.ready_replicas}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">Available:</span>
+                                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{dep.available_replicas ?? dep.ready_replicas}</span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1028,74 +2033,21 @@ function DeploymentsTable({ data, searchQuery, onRefresh }: { data: Deployment[]
         </div>
       )}
 
-      {/* Scale Modal */}
-      <AnimatePresence>
-        {scaleModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-            onClick={() => setScaleModal(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Scale Deployment
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Scaling <span className="font-medium text-gray-700 dark:text-gray-300">{scaleModal.dep.name}</span> in namespace <span className="font-medium text-gray-700 dark:text-gray-300">{scaleModal.dep.namespace}</span>
-              </p>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Replicas
-                </label>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setScaleModal({ ...scaleModal, replicas: Math.max(0, scaleModal.replicas - 1) })}
-                    className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-                  >
-                    <StopIcon className="h-4 w-4" />
-                  </button>
-                  <input
-                    type="number"
-                    min="0"
-                    value={scaleModal.replicas}
-                    onChange={(e) => setScaleModal({ ...scaleModal, replicas: parseInt(e.target.value) || 0 })}
-                    className="w-20 text-center px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
-                  />
-                  <button
-                    onClick={() => setScaleModal({ ...scaleModal, replicas: scaleModal.replicas + 1 })}
-                    className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-                  >
-                    <PlayIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setScaleModal(null)}
-                  className="px-4 py-2 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleScale(scaleModal.dep, scaleModal.replicas)}
-                  disabled={actionLoading !== null}
-                  className="px-4 py-2 text-sm font-medium rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? 'Scaling...' : 'Scale'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Scale Modal - Using reusable component */}
+      {scaleModal && (
+        <ScaleModal
+          isOpen={!!scaleModal}
+          onClose={() => setScaleModal(null)}
+          resourceName={scaleModal.dep.name}
+          resourceType="Deployment"
+          namespace={scaleModal.dep.namespace}
+          currentReplicas={scaleModal.dep.replicas}
+          onScale={async (replicas) => {
+            await handleScale(scaleModal.dep, replicas);
+          }}
+          isLoading={actionLoading !== null}
+        />
+      )}
 
       {/* YAML Modal */}
       <AnimatePresence>
@@ -1106,6 +2058,21 @@ function DeploymentsTable({ data, searchQuery, onRefresh }: { data: Deployment[]
             resourceType="deployment"
             namespace={yamlModal.namespace}
             name={yamlModal.name}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Rollback Modal */}
+      <AnimatePresence>
+        {rollbackModal && (
+          <RollbackModal
+            isOpen={!!rollbackModal}
+            onClose={() => setRollbackModal(null)}
+            deployment={rollbackModal}
+            onRollback={async (revision) => {
+              await handleRollback(rollbackModal, revision);
+            }}
+            isLoading={actionLoading !== null}
           />
         )}
       </AnimatePresence>
@@ -1127,7 +2094,9 @@ function PodsTable({ data, searchQuery }: { data: Pod[]; searchQuery: string }) 
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<SortConfig<Pod>>({ key: null, direction: null });
   const [yamlModal, setYamlModal] = useState<{ namespace: string; name: string } | null>(null);
+  const [logsModal, setLogsModal] = useState<Pod | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [execModal, setExecModal] = useState<Pod | null>(null);
 
   // Filter by search query
   const searchFiltered = data.filter(pod =>
@@ -1255,10 +2224,21 @@ function PodsTable({ data, searchQuery }: { data: Pod[]; searchQuery: string }) 
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
+                            onClick={() => setLogsModal(pod)}
                             className="p-2 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                             title="View Logs"
                           >
                             <DocumentTextIcon className="h-4 w-4" />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setExecModal(pod)}
+                            disabled={pod.status !== 'Running'}
+                            className="p-2 rounded-lg text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={pod.status === 'Running' ? 'Execute commands in pod' : 'Pod must be running to exec'}
+                          >
+                            <CommandLineIcon className="h-4 w-4" />
                           </motion.button>
                           <motion.button
                             whileHover={{ scale: 1.05 }}
@@ -1318,18 +2298,10 @@ function PodsTable({ data, searchQuery }: { data: Pod[]; searchQuery: string }) 
                                   </div>
                                 </div>
                                 <div className="space-y-2">
-                                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quick Actions</h4>
-                                  <div className="flex gap-2">
-                                    <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors">
-                                      Stream Logs
-                                    </button>
-                                    <button
-                                      onClick={() => setYamlModal({ namespace: pod.namespace, name: pod.name })}
-                                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-                                    >
-                                      View YAML
-                                    </button>
-                                  </div>
+                                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Node</h4>
+                                  <p className="font-mono text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded inline-block">
+                                    {pod.node || 'Not scheduled'}
+                                  </p>
                                 </div>
                               </div>
                             </div>
@@ -1354,6 +2326,22 @@ function PodsTable({ data, searchQuery }: { data: Pod[]; searchQuery: string }) 
             resourceType="pod"
             namespace={yamlModal.namespace}
             name={yamlModal.name}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Logs Modal */}
+      {logsModal && (
+        <PodLogsViewer pod={logsModal} onClose={() => setLogsModal(null)} />
+      )}
+
+      {/* Exec Modal */}
+      <AnimatePresence>
+        {execModal && (
+          <PodExecModal
+            isOpen={!!execModal}
+            onClose={() => setExecModal(null)}
+            pod={execModal}
           />
         )}
       </AnimatePresence>
@@ -1644,81 +2632,283 @@ function PVCsTable({ data, searchQuery }: { data: PVC[]; searchQuery: string }) 
   );
 }
 
-function StatefulSetsTable({ data, searchQuery }: { data: StatefulSet[]; searchQuery: string }) {
-  const filteredData = data.filter(ss =>
+// Filter options for StatefulSets
+const statefulSetFilterOptions: StatusFilterOption[] = [
+  { value: 'all', label: 'All StatefulSets', color: 'gray' },
+  { value: 'healthy', label: 'Healthy', color: 'success' },
+  { value: 'degraded', label: 'Degraded', color: 'warning' },
+];
+
+function StatefulSetsTable({ data, searchQuery, onRefresh }: { data: StatefulSet[]; searchQuery: string; onRefresh: () => void }) {
+  const toast = useToast();
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [scaleModal, setScaleModal] = useState<{ ss: StatefulSet; replicas: number } | null>(null);
+  const [yamlModal, setYamlModal] = useState<{ namespace: string; name: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig<StatefulSet>>({ key: null, direction: null });
+
+  // Filter by search query
+  const searchFiltered = data.filter(ss =>
     ss.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     ss.namespace.toLowerCase().includes(searchQuery.toLowerCase()) ||
     ss.image?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (filteredData.length === 0) {
+  // Filter by status
+  const statusFiltered = useMemo(() => {
+    if (statusFilter === 'all') return searchFiltered;
+    if (statusFilter === 'healthy') return searchFiltered.filter(ss => ss.ready_replicas === ss.replicas);
+    if (statusFilter === 'degraded') return searchFiltered.filter(ss => ss.ready_replicas !== ss.replicas);
+    return searchFiltered;
+  }, [searchFiltered, statusFilter]);
+
+  // Sort data
+  const filteredData = useMemo(() => sortData(statusFiltered, sortConfig), [statusFiltered, sortConfig]);
+
+  const handleSort = (key: keyof StatefulSet) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const handleScale = async (ss: StatefulSet, replicas: number) => {
+    setActionLoading(`scale-${ss.namespace}-${ss.name}`);
+    try {
+      await kubernetesApi.executeKubectl({
+        command: `scale statefulset ${ss.name} --replicas=${replicas} -n ${ss.namespace}`,
+      });
+      toast.success('StatefulSet scaled', `${ss.name} scaled to ${replicas} replicas`);
+      onRefresh();
+    } catch (error) {
+      toast.error('Scale failed', `Failed to scale ${ss.name}`);
+    } finally {
+      setActionLoading(null);
+      setScaleModal(null);
+    }
+  };
+
+  const handleRestart = async (ss: StatefulSet) => {
+    setActionLoading(`restart-${ss.namespace}-${ss.name}`);
+    try {
+      await kubernetesApi.executeKubectl({
+        command: `rollout restart statefulset ${ss.name} -n ${ss.namespace}`,
+      });
+      toast.success('StatefulSet restarted', `${ss.name} is restarting`);
+      onRefresh();
+    } catch (error) {
+      toast.error('Restart failed', `Failed to restart ${ss.name}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (data.length === 0) {
     return <EmptyState icon={ServerStackIcon} title={searchQuery ? "No matching statefulsets" : "No statefulsets found"} />;
   }
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-gray-100 dark:border-slate-700">
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Name</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Namespace</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Ready</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Image</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Age</th>
-            <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredData.map((ss, index) => (
-            <motion.tr
-              key={`${ss.namespace}-${ss.name}`}
-              custom={index}
-              variants={tableRowVariants}
-              initial="hidden"
-              animate="visible"
-              className="border-b border-gray-50 dark:border-slate-700/50 hover:bg-gray-50/50 dark:hover:bg-slate-700/30 transition-colors"
-            >
-              <td className="py-3 px-4 font-medium text-gray-900 dark:text-gray-100">{ss.name}</td>
-              <td className="py-3 px-4">
-                <span className="px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300">
-                  {ss.namespace}
-                </span>
-              </td>
-              <td className="py-3 px-4">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${
-                  ss.ready_replicas === ss.replicas
-                    ? 'bg-success-500/10 text-success-600 dark:text-success-400 ring-success-500/20'
-                    : 'bg-warning-500/10 text-warning-600 dark:text-warning-400 ring-warning-500/20'
-                }`}>
-                  {ss.ready_replicas}/{ss.replicas}
-                </span>
-              </td>
-              <td className="py-3 px-4 text-gray-500 dark:text-gray-400 text-sm truncate max-w-xs font-mono">{ss.image?.split('/').pop() || '-'}</td>
-              <td className="py-3 px-4 text-gray-500 dark:text-gray-400 text-sm">{ss.age}</td>
-              <td className="py-3 px-4">
-                <div className="flex items-center justify-end gap-1">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="p-2 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-                    title="Scale"
-                  >
-                    <ScaleIcon className="h-4 w-4" />
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="p-2 rounded-lg text-gray-500 hover:text-warning-600 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors"
-                    title="Restart"
-                  >
-                    <ArrowPathIcon className="h-4 w-4" />
-                  </motion.button>
-                </div>
-              </td>
-            </motion.tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {/* Status Filter */}
+      <StatusFilter options={statefulSetFilterOptions} selected={statusFilter} onChange={setStatusFilter} />
+
+      {filteredData.length === 0 ? (
+        <EmptyState icon={ServerStackIcon} title="No statefulsets match filters" />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-slate-700">
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 w-8"></th>
+                <SortableHeader<StatefulSet> label="Name" sortKey="name" sortConfig={sortConfig} onSort={handleSort} />
+                <SortableHeader<StatefulSet> label="Namespace" sortKey="namespace" sortConfig={sortConfig} onSort={handleSort} />
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Ready</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Image</th>
+                <SortableHeader<StatefulSet> label="Age" sortKey="age" sortConfig={sortConfig} onSort={handleSort} />
+                <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.map((ss, index) => {
+                const isExpanded = expandedRow === `${ss.namespace}-${ss.name}`;
+                const rowKey = `${ss.namespace}-${ss.name}`;
+                return (
+                  <>
+                    <motion.tr
+                      key={rowKey}
+                      custom={index}
+                      variants={tableRowVariants}
+                      initial="hidden"
+                      animate="visible"
+                      className={`border-b border-gray-50 dark:border-slate-700/50 hover:bg-gray-50/50 dark:hover:bg-slate-700/30 transition-colors ${isExpanded ? 'bg-primary-50/30 dark:bg-primary-900/10' : ''}`}
+                    >
+                      <td className="py-3 px-4">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => setExpandedRow(isExpanded ? null : rowKey)}
+                          className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          {isExpanded ? (
+                            <ChevronUpIcon className="h-4 w-4 text-gray-500" />
+                          ) : (
+                            <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+                          )}
+                        </motion.button>
+                      </td>
+                      <td className="py-3 px-4 font-medium text-gray-900 dark:text-gray-100">{ss.name}</td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300">
+                          {ss.namespace}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${
+                          ss.ready_replicas === ss.replicas
+                            ? 'bg-success-500/10 text-success-600 dark:text-success-400 ring-success-500/20'
+                            : 'bg-warning-500/10 text-warning-600 dark:text-warning-400 ring-warning-500/20'
+                        }`}>
+                          {ss.ready_replicas}/{ss.replicas}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400 text-sm truncate max-w-xs font-mono">{ss.image?.split('/').pop() || '-'}</td>
+                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400 text-sm">{ss.age}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setScaleModal({ ss, replicas: ss.replicas })}
+                            className="p-2 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                            title="Scale"
+                          >
+                            <ScaleIcon className="h-4 w-4" />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleRestart(ss)}
+                            disabled={actionLoading === `restart-${ss.namespace}-${ss.name}`}
+                            className="p-2 rounded-lg text-gray-500 hover:text-warning-600 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors disabled:opacity-50"
+                            title="Restart"
+                          >
+                            {actionLoading === `restart-${ss.namespace}-${ss.name}` ? (
+                              <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ArrowPathIcon className="h-4 w-4" />
+                            )}
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setYamlModal({ namespace: ss.namespace, name: ss.name })}
+                            className="p-2 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                            title="View YAML"
+                          >
+                            <CodeBracketIcon className="h-4 w-4" />
+                          </motion.button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.tr
+                          key={`${rowKey}-details`}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                        >
+                          <td colSpan={7} className="p-0">
+                            <div className="px-6 py-4 bg-gray-50/50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Full Image Path</h4>
+                                  <p className="font-mono text-xs text-gray-700 dark:text-gray-300 break-all bg-gray-100 dark:bg-slate-700 p-2 rounded-lg">
+                                    {ss.image || '-'}
+                                  </p>
+                                </div>
+                                <div className="space-y-2">
+                                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Labels</h4>
+                                  <div className="flex flex-wrap gap-1">
+                                    {ss.labels && Object.keys(ss.labels).length > 0 ? (
+                                      Object.entries(ss.labels).slice(0, 4).map(([key, value]) => (
+                                        <span key={key} className="px-2 py-0.5 rounded text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 font-mono">
+                                          {key.split('/').pop()}={String(value).length > 15 ? String(value).slice(0, 15) + '...' : value}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="text-sm text-gray-400">No labels</span>
+                                    )}
+                                    {ss.labels && Object.keys(ss.labels).length > 4 && (
+                                      <span className="px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-slate-700 text-gray-500">
+                                        +{Object.keys(ss.labels).length - 4} more
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Replica Status</h4>
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">Replicas:</span>
+                                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{ss.replicas}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">Ready:</span>
+                                      <span className={`text-sm font-semibold ${ss.ready_replicas === ss.replicas ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400'}`}>
+                                        {ss.ready_replicas}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">Service:</span>
+                                      <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{ss.name}-headless</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )}
+                    </AnimatePresence>
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Scale Modal - Using reusable component */}
+      {scaleModal && (
+        <ScaleModal
+          isOpen={!!scaleModal}
+          onClose={() => setScaleModal(null)}
+          resourceName={scaleModal.ss.name}
+          resourceType="StatefulSet"
+          namespace={scaleModal.ss.namespace}
+          currentReplicas={scaleModal.ss.replicas}
+          onScale={async (replicas) => {
+            await handleScale(scaleModal.ss, replicas);
+          }}
+          isLoading={actionLoading !== null}
+        />
+      )}
+
+      {/* YAML Modal */}
+      <AnimatePresence>
+        {yamlModal && (
+          <YAMLModal
+            isOpen={!!yamlModal}
+            onClose={() => setYamlModal(null)}
+            resourceType="statefulset"
+            namespace={yamlModal.namespace}
+            name={yamlModal.name}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

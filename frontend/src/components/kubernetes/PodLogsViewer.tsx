@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 import {
   DocumentTextIcon,
   ArrowPathIcon,
@@ -11,6 +13,8 @@ import {
   ExclamationTriangleIcon,
   InformationCircleIcon,
   BellAlertIcon,
+  ArrowsPointingOutIcon,
+  ArrowsPointingInIcon,
 } from '@heroicons/react/24/outline';
 import { kubernetesApi } from '../../services/api';
 import { useWebSocketLogs } from '../../hooks/useWebSocketLogs';
@@ -82,11 +86,23 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
   const [tryFetchAnyway, setTryFetchAnyway] = useState(false);
   const [events, setEvents] = useState<K8sEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Check if logs can be fetched based on pod status
   const podCanHaveLogs = canHaveLogs(pod.status);
   const statusInfo = getStatusInfo(pod.status);
+
+  // Keyboard shortcut: Escape to close
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   // WebSocket streaming hook
   const {
@@ -220,9 +236,18 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
   const currentError = streamingMode ? wsError : error;
   const isLoading = streamingMode ? !wsConnected && wsStatus === 'connecting' : loading && !logs;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col">
+  // Use React Portal to render panel at document.body level
+  // Non-blocking slide-in panel from the right, positioned below main header
+  return createPortal(
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className={`fixed top-16 right-0 bottom-0 z-[9999] flex flex-col bg-white dark:bg-slate-800 shadow-2xl border-l border-gray-200 dark:border-slate-700 ${
+        isExpanded ? 'w-full left-0' : 'w-[55%] min-w-[600px]'
+      }`}
+    >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
@@ -263,6 +288,18 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
                 {wsConnected ? 'Live' : wsStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
               </div>
             )}
+            {/* Expand/Collapse button */}
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+              title={isExpanded ? 'Collapse panel' : 'Expand to full screen'}
+            >
+              {isExpanded ? (
+                <ArrowsPointingInIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              ) : (
+                <ArrowsPointingOutIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              )}
+            </button>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg">
               <XMarkIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             </button>
@@ -521,12 +558,13 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
                 </span>
               )
             )}
+            <span className="text-xs">Press Esc to close</span>
           </div>
           <button onClick={scrollToBottom} className="text-primary-600 dark:text-primary-400 hover:underline">
             Scroll to bottom
           </button>
         </div>
-      </div>
-    </div>
+    </motion.div>,
+    document.body
   );
 }

@@ -497,84 +497,102 @@ export default function Layout({ children }: LayoutProps) {
         transition={{ duration: 0.3, ease: 'easeInOut' }}
         style={{ paddingLeft: undefined }} // Let className handle initial state
       >
-        {/* Top bar */}
-        <div className="sticky top-0 z-40 h-16 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center px-4 lg:px-8 transition-colors">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="lg:hidden flex items-center gap-2 px-3 py-2 rounded-xl bg-primary-500/10 hover:bg-primary-500/20 transition-colors"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Bars3Icon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-            <span className="text-sm font-medium text-primary-600 dark:text-primary-400">Menu</span>
-          </motion.button>
+        {/* Modern Top bar with glassmorphism */}
+        <div className="sticky top-0 z-40 h-16">
+          {/* Glassmorphic background */}
+          <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/30 dark:border-slate-700/30 shadow-lg shadow-gray-200/20 dark:shadow-slate-900/50" />
 
-          <div className="flex-1 flex justify-end items-center gap-3">
-            {/* Cluster Switcher */}
-            <ClusterSwitcher />
+          {/* Gradient accent line at top */}
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-500 via-purple-500 to-pink-500 opacity-80" />
 
-            {/* Dark mode toggle */}
+          {/* Content */}
+          <div className="relative h-full flex items-center px-4 lg:px-8">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={toggleTheme}
-              className="p-2.5 rounded-xl bg-gray-100/50 dark:bg-slate-700/50 hover:bg-gray-200/50 dark:hover:bg-slate-600/50 transition-all duration-300 border border-gray-200/50 dark:border-slate-600/50"
-              title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              className="lg:hidden flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-primary-500/10 to-purple-500/10 hover:from-primary-500/20 hover:to-purple-500/20 border border-primary-500/20 transition-all duration-300"
+              onClick={() => setSidebarOpen(true)}
             >
-              <AnimatePresence mode="wait">
-                {theme === 'light' ? (
-                  <motion.div
-                    key="moon"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <MoonIcon className="h-5 w-5 text-gray-600" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="sun"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <SunIcon className="h-5 w-5 text-yellow-500" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <Bars3Icon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+              <span className="text-sm font-semibold text-primary-600 dark:text-primary-400">Menu</span>
             </motion.button>
 
-            {/* User info and logout */}
-            {user && (
-              <div className="flex items-center gap-3 border-l border-gray-200/50 dark:border-slate-600/50 pl-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-purple-500 flex items-center justify-center shadow-md">
-                    <span className="text-white font-semibold text-sm">
-                      {user.username.charAt(0).toUpperCase()}
-                    </span>
+            <div className="flex-1 flex justify-end items-center gap-4">
+              {/* Cluster Switcher */}
+              <ClusterSwitcher />
+
+              {/* Dark mode toggle - Modern pill style */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={toggleTheme}
+                className="relative p-2.5 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 dark:from-slate-700 dark:to-slate-800 hover:from-gray-200 hover:to-gray-100 dark:hover:from-slate-600 dark:hover:to-slate-700 transition-all duration-300 border border-gray-200/50 dark:border-slate-600/50 shadow-sm hover:shadow-md"
+                title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              >
+                <AnimatePresence mode="wait">
+                  {theme === 'light' ? (
+                    <motion.div
+                      key="moon"
+                      initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
+                      animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                      exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <MoonIcon className="h-5 w-5 text-slate-600" />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="sun"
+                      initial={{ rotate: 90, opacity: 0, scale: 0.5 }}
+                      animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                      exit={{ rotate: -90, opacity: 0, scale: 0.5 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <SunIcon className="h-5 w-5 text-amber-500" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+
+              {/* User info and logout - Modern card style */}
+              {user && (
+                <div className="flex items-center gap-3 pl-4 border-l border-gray-200/50 dark:border-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    {/* Avatar with status indicator */}
+                    <div className="relative">
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-primary-500/30"
+                      >
+                        <span className="text-white font-bold text-sm">
+                          {user.username.charAt(0).toUpperCase()}
+                        </span>
+                      </motion.div>
+                      {/* Online status dot */}
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-success-500 rounded-full border-2 border-white dark:border-slate-900" />
+                    </div>
+                    <div className="hidden sm:block">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        {user.username}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 capitalize flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                        {user.role}
+                      </p>
+                    </div>
                   </div>
-                  <div className="hidden sm:block">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                      {user.username}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                      {user.role}
-                    </p>
-                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={logout}
+                    className="p-2.5 rounded-xl bg-gray-100/50 dark:bg-slate-700/50 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 border border-transparent hover:border-red-200 dark:hover:border-red-900/50"
+                    title="Sign out"
+                  >
+                    <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                  </motion.button>
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={logout}
-                  className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                  title="Sign out"
-                >
-                  <ArrowRightOnRectangleIcon className="h-5 w-5" />
-                </motion.button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
