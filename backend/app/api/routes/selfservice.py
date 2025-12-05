@@ -1,5 +1,4 @@
 import logging
-import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -7,16 +6,6 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 logger = logging.getLogger(__name__)
-
-
-def sanitize_log_input(value: str, max_length: int = 63) -> str:
-    """Sanitize user input for safe logging (prevent log injection)."""
-    if not value:
-        return "<empty>"
-    sanitized = re.sub(r"[\r\n\t\x00-\x1f\x7f-\x9f]", "", value)
-    if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length] + "..."
-    return sanitized
 
 from app.schemas.gitflow import Environment
 from app.schemas.selfservice import (
@@ -84,8 +73,8 @@ async def get_service(namespace: str, service_name: str):
                     health_status="healthy" if dep.ready_replicas == dep.replicas else "degraded",
                 )
     except Exception as e:
-        # Log the error but don't expose details to client
-        logger.warning("Error fetching service %s: %s", sanitize_log_input(service_name), type(e).__name__)
+        # Log error without user-controlled input to prevent log injection
+        logger.warning("Error fetching service from catalog: %s", type(e).__name__)
 
     raise HTTPException(status_code=404, detail="Service not found")
 
