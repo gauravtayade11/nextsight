@@ -45,7 +45,7 @@ class WebSocketManager:
                 websocket=websocket, namespace=namespace, pod_name=pod_name, container=container, timestamps=timestamps
             )
 
-        logger.info(f"WebSocket connected: {connection_id} for {namespace}/{pod_name}/{container}")
+        logger.info("WebSocket connected: %s", connection_id)
         return connection_id
 
     async def disconnect(self, connection_id: str):
@@ -70,8 +70,8 @@ class WebSocketManager:
         if conn:
             try:
                 await conn.websocket.send_json({"type": "log", "content": log_line})
-            except Exception as e:
-                logger.error(f"Error sending log to {connection_id}: {e}")
+            except Exception:
+                logger.error("Error sending log to WebSocket connection")
                 await self.disconnect(connection_id)
 
     async def send_status(self, connection_id: str, status: str, message: str = ""):
@@ -82,8 +82,8 @@ class WebSocketManager:
         if conn:
             try:
                 await conn.websocket.send_json({"type": "status", "status": status, "message": message})
-            except Exception as e:
-                logger.error(f"Error sending status to {connection_id}: {e}")
+            except Exception:
+                logger.error("Error sending status to WebSocket connection")
 
     async def send_error(self, connection_id: str, error: str, code: int = 500):
         """Send an error message to a connection."""
@@ -93,8 +93,8 @@ class WebSocketManager:
         if conn:
             try:
                 await conn.websocket.send_json({"type": "error", "error": error, "code": code})
-            except Exception as e:
-                logger.error(f"Error sending error to {connection_id}: {e}")
+            except Exception:
+                logger.error("Error sending error to WebSocket connection")
 
     def get_connection(self, connection_id: str) -> LogStreamConnection:
         """Get connection details."""

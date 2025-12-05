@@ -232,10 +232,6 @@ async def websocket_pod_exec(
     master_fd = None
     pid = None
 
-    # Sanitize for logging
-    safe_ns = sanitize_log_input(namespace)
-    safe_pod = sanitize_log_input(pod_name)
-
     try:
         # Build kubectl exec command with validated inputs
         kubectl_cmd = ["kubectl"]
@@ -248,7 +244,7 @@ async def websocket_pod_exec(
             kubectl_cmd.extend(["-c", container])
         kubectl_cmd.extend(["--", shell])
 
-        logger.info("Starting exec session for pod %s in namespace %s", safe_pod, safe_ns)
+        logger.info("Starting exec session")
 
         # Create PTY and spawn kubectl exec
         pid, master_fd = pty.fork()
@@ -344,7 +340,7 @@ async def websocket_pod_exec(
                     pass
 
     except WebSocketDisconnect:
-        logger.info("Exec WebSocket disconnected for pod %s in namespace %s", safe_pod, safe_ns)
+        logger.info("Exec WebSocket disconnected")
     except Exception as e:
         logger.error("Exec WebSocket error: %s", type(e).__name__)
         try:
@@ -372,7 +368,7 @@ async def websocket_pod_exec(
             })
         except Exception:
             pass  # WebSocket may already be closed
-        logger.info("Exec session ended for pod %s in namespace %s", safe_pod, safe_ns)
+        logger.info("Exec session ended")
 
 
 @router.websocket("/pods/{namespace}/{pod_name}/debug")
@@ -420,10 +416,6 @@ async def websocket_pod_debug(
     master_fd = None
     pid = None
 
-    # Sanitize for logging
-    safe_ns = sanitize_log_input(namespace)
-    safe_pod = sanitize_log_input(pod_name)
-
     try:
         # Build kubectl debug command with validated inputs
         kubectl_cmd = ["kubectl"]
@@ -444,7 +436,7 @@ async def websocket_pod_debug(
         # Add shell command
         kubectl_cmd.extend(["--", "/bin/sh"])
 
-        logger.info("Starting debug session for pod %s in namespace %s", safe_pod, safe_ns)
+        logger.info("Starting debug session")
 
         # Create PTY and spawn kubectl debug
         pid, master_fd = pty.fork()
@@ -533,9 +525,9 @@ async def websocket_pod_debug(
                     pass
 
     except WebSocketDisconnect:
-        logger.info("Debug WebSocket disconnected for pod %s in namespace %s", safe_pod, safe_ns)
+        logger.info("Debug WebSocket disconnected")
     except Exception:
-        logger.error("Debug WebSocket error for pod %s in namespace %s", safe_pod, safe_ns)
+        logger.error("Debug WebSocket error")
         try:
             await websocket.send_json({"type": "error", "error": "Internal server error", "code": 500})
         except Exception:
@@ -561,4 +553,4 @@ async def websocket_pod_debug(
             })
         except Exception:
             pass  # WebSocket may already be closed
-        logger.info("Debug session ended for pod %s in namespace %s", safe_pod, safe_ns)
+        logger.info("Debug session ended")
