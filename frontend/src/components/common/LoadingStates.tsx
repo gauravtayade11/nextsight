@@ -91,7 +91,7 @@ export function PageLoader() {
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 2, repeat: Infinity }}
         >
-          Loading NexOps...
+          Loading NextSight AI...
         </motion.h2>
         <div className="mt-4 flex justify-center">
           <PulseDots />

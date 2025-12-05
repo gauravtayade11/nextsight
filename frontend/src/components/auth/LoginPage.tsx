@@ -35,7 +35,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h1 className="text-center text-3xl font-bold text-primary-600 dark:text-primary-400">
-            NexOps
+            NextSight AI
           </h1>
           <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
             Sign in to your account

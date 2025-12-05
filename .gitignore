@@ -70,3 +70,7 @@ secrets.yml
 
 # Articles (personal content)
 articles/
+
+# Internal planning docs
+ROADMAP.md
+RELEASE_NOTES*.md

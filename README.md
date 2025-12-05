@@ -1,14 +1,14 @@
 <div align="center">
 
-# NexOps
+# NextSight AI
 
-### DevOps Operations Center
+### See your DevOps world in one intelligent view
 
 [![CI](https://github.com/gauravtayade11/nexops/actions/workflows/ci.yml/badge.svg)](https://github.com/gauravtayade11/nexops/actions/workflows/ci.yml)
 [![Security](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml/badge.svg)](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml)
 [![CodeQL](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/gauravtayade11/nexops/security/code-scanning)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)](https://github.com/gauravtayade11/nexops/releases)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/gauravtayade11/nexops/releases)
 [![GitHub stars](https://img.shields.io/github/stars/gauravtayade11/nexops?style=social)](https://github.com/gauravtayade11/nexops/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/gauravtayade11/nexops?style=social)](https://github.com/gauravtayade11/nexops/network/members)
 
@@ -21,7 +21,7 @@
 [![Helm](https://img.shields.io/badge/Helm-Chart-0F1689.svg)](https://helm.sh/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/gauravtayade11/nexops/pulls)
 
-**A modern, comprehensive Kubernetes management dashboard for DevOps teams.**
+**AI-powered Kubernetes management platform with real-time monitoring, security scanning, and intelligent insights.**
 
 [Features](#features) • [Screenshots](#screenshots) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Helm](#helm-installation) • [Contributing](#contributing)
 
@@ -34,7 +34,7 @@
 <div align="center">
 
 ### Dashboard Overview
-![NexOps Dashboard](docs/images/HomePage.png)
+![NextSight AI Dashboard](docs/images/HomePage.png)
 
 ### Kubernetes Resources
 ![Kubernetes Resources](docs/images/Kuberntes.png)
@@ -46,7 +46,7 @@
 
 ## Overview
 
-NexOps is a powerful DevOps Operations Center that provides real-time visibility and control over your Kubernetes clusters. Built with FastAPI and React, it offers an intuitive web interface for monitoring, managing, and troubleshooting your containerized applications.
+NextSight AI is an AI-powered Kubernetes management platform that provides real-time visibility, intelligent security insights, and complete control over your clusters. Built with FastAPI and React, it combines traditional monitoring with AI-powered analysis for smarter DevOps operations.
 
 ## Features
 
@@ -178,7 +178,7 @@ Create a `.env` file in the backend directory:
 
 ```env
 # Application
-APP_NAME=NexOps Center
+APP_NAME=NextSight AI
 DEBUG=false
 
 # Kubernetes (for local development)
@@ -275,7 +275,7 @@ kubectl port-forward -n nexops svc/nexops-frontend 3000:80
 
 ### Helm Installation
 
-Deploy NexOps to your Kubernetes cluster using Helm:
+Deploy NextSight AI to your Kubernetes cluster using Helm:
 
 ```bash
 # Add the repository (when published)

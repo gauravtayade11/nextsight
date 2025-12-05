@@ -23,7 +23,7 @@ const KubernetesResourcesView = lazy(() => import('./components/kubernetes/Kuber
 const YAMLDeploy = lazy(() => import('./components/kubernetes/YAMLDeploy'));
 const KubectlTerminal = lazy(() => import('./components/kubernetes/KubectlTerminal'));
 const HelmDashboard = lazy(() => import('./components/helm/HelmDashboard'));
-const CostDashboard = lazy(() => import('./components/cost/CostDashboard'));
+// Cost feature removed in v1.4.0 - focusing on core features
 const ClusterManagement = lazy(() => import('./components/clusters/ClusterManagement'));
 const SecurityDashboard = lazy(() => import('./components/security/SecurityDashboard'));
 const AIChatPanel = lazy(() => import('./components/common/AIChatPanel').then(m => ({ default: m.default })));
@@ -74,7 +74,6 @@ function AppContent() {
                     <Route path="/selfservice" element={<SelfServicePortal />} />
                     <Route path="/releases" element={<ReleaseManager />} />
                     <Route path="/helm" element={<HelmDashboard />} />
-                    <Route path="/cost" element={<CostDashboard />} />
                     <Route path="/security" element={<SecurityDashboard />} />
                   </Routes>
                 </Suspense>

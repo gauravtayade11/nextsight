@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-12-05
+
+### Added
+- **Trivy in Docker Image** - Built-in vulnerability scanning
+  - Trivy binary included in backend Docker image
+  - No external dependencies required for image scanning
+  - Version 0.58.0 installed
+- **Metrics Server Status Endpoint** - Check metrics-server availability
+  - New `/api/v1/kubernetes/metrics/status` endpoint
+  - Auto-detect if metrics-server is installed
+  - Graceful fallback for clusters without metrics-server
+
+### Changed
+- **Project Rebrand to NextSight AI**
+  - New name: NextSight AI
+  - Tagline: "See your DevOps world in one intelligent view"
+  - Updated all UI components, configs, and documentation
+  - Helm chart description updated
+
 ## [1.3.0] - 2025-12-04
 
 ### Added
@@ -225,6 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 1.4.0 | 2025-12-05 | NextSight AI Rebrand, Trivy in Docker, Metrics Server Status |
 | 1.3.0 | 2025-12-04 | Pod Exec Terminal, Debug Containers, Security Dashboard, Glass-morphism UI |
 | 1.2.0 | 2024-12-02 | Dark Mode, Terminal Persistence, Multi-Cluster, RBAC, Helm UI, Cost Dashboard |
 | 1.1.0 | 2024-12-01 | WebSocket Real-Time Log Streaming |

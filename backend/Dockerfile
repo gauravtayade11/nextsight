@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies including kubectl
+# Install system dependencies including kubectl, helm, and trivy
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     && chmod +x kubectl \
     && mv kubectl /usr/local/bin/ \
     && curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash \
+    && curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.58.0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

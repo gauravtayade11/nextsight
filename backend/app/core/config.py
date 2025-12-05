@@ -6,8 +6,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "NexOps Center"
-    APP_VERSION: str = "1.3.1"
+    APP_NAME: str = "NextSight AI"
+    APP_VERSION: str = "1.4.0"
     DEBUG: bool = False
     API_PREFIX: str = "/api/v1"
 

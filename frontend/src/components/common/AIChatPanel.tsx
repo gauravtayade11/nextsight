@@ -37,7 +37,7 @@ export default function AIChatPanel({ onClose }: AIChatPanelProps) {
     {
       id: '1',
       role: 'assistant',
-      content: 'Hi! I\'m your NexOps AI assistant. How can I help you today?',
+      content: 'Hi! I\'m your NextSight AI assistant. How can I help you today?',
       timestamp: new Date(),
     },
   ]);
@@ -144,7 +144,7 @@ export default function AIChatPanel({ onClose }: AIChatPanelProps) {
           <div className="p-1.5 rounded-lg bg-gradient-to-br from-primary-500 to-purple-500">
             <SparklesIcon className="h-4 w-4 text-white" />
           </div>
-          <span className="text-sm font-medium text-gray-900 dark:text-white">NexOps AI</span>
+          <span className="text-sm font-medium text-gray-900 dark:text-white">NextSight AI</span>
           <ArrowsPointingOutIcon className="h-4 w-4 text-gray-400" />
         </motion.button>
       </motion.div>
@@ -167,7 +167,7 @@ export default function AIChatPanel({ onClose }: AIChatPanelProps) {
               <SparklesIcon className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">NexOps AI</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">NextSight AI</h3>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${aiAvailable ? 'bg-success-500' : aiAvailable === false ? 'bg-danger-500' : 'bg-gray-400'}`} />
                 {aiAvailable ? 'Online' : aiAvailable === false ? 'Offline' : 'Checking...'}

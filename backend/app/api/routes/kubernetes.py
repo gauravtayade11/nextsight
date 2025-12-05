@@ -202,6 +202,24 @@ async def get_node(node_name: str):
 
 
 # Metrics endpoints
+@router.get("/metrics/status")
+async def get_metrics_server_status():
+    """Check if metrics-server is available in the cluster."""
+    try:
+        metrics = await kubernetes_service.get_node_metrics()
+        return {
+            "available": len(metrics) > 0,
+            "message": "Metrics server is available" if metrics else "Metrics server not found",
+            "node_count": len(metrics)
+        }
+    except Exception:
+        return {
+            "available": False,
+            "message": "Metrics server not available or not installed",
+            "node_count": 0
+        }
+
+
 @router.get("/metrics", response_model=ClusterMetrics)
 async def get_cluster_metrics():
     """Get cluster-wide resource metrics (requires metrics-server)."""

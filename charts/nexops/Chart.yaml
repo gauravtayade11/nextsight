@@ -1,9 +1,9 @@
 apiVersion: v2
 name: nexops
-description: A Helm chart for NexOps - DevOps Operations Center
+description: A Helm chart for NextSight AI - See your DevOps world in one intelligent view
 type: application
-version: 1.3.0
-appVersion: "1.3.0"
+version: 1.4.0
+appVersion: "1.4.0"
 keywords:
   - kubernetes
   - dashboard

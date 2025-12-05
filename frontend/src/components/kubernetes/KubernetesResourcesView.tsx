@@ -505,7 +505,7 @@ function PodExecModal({ isOpen, onClose, pod }: PodExecModalProps) {
     fitAddonRef.current = fitAddon;
 
     terminal.writeln('\x1b[1;32m┌──────────────────────────────────────────┐\x1b[0m');
-    terminal.writeln('\x1b[1;32m│\x1b[0m  \x1b[1;36mNexOps Pod Terminal\x1b[0m                     \x1b[1;32m│\x1b[0m');
+    terminal.writeln('\x1b[1;32m│\x1b[0m  \x1b[1;36mNextSight AI Pod Terminal\x1b[0m                \x1b[1;32m│\x1b[0m');
     terminal.writeln('\x1b[1;32m└──────────────────────────────────────────┘\x1b[0m');
     terminal.writeln('');
     terminal.writeln(`\x1b[90mPod:\x1b[0m ${pod.name}`);

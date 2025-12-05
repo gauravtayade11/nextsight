@@ -59,7 +59,6 @@ const navigation: NavItem[] = [
   },
   { name: 'Clusters', href: '/clusters', icon: CloudIcon },
   { name: 'Helm', href: '/helm', icon: CubeIcon },
-  { name: 'Cost', href: '/cost', icon: CurrencyDollarIcon },
   { name: 'Security', href: '/security', icon: ShieldCheckIcon },
   { name: 'Incidents', href: '/incidents', icon: ExclamationTriangleIcon },
   { name: 'Timeline', href: '/timeline', icon: ClockIcon },
@@ -344,7 +343,7 @@ export default function Layout({ children }: LayoutProps) {
                       <span className="text-white font-bold text-sm">N</span>
                     </div>
                     <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
-                      NexOps
+                      NextSight AI
                     </span>
                   </div>
                   <motion.button
@@ -370,10 +369,10 @@ export default function Layout({ children }: LayoutProps) {
                   <div className="p-3 rounded-2xl bg-gradient-to-br from-primary-500/10 via-purple-500/10 to-pink-500/10 border border-primary-500/20 backdrop-blur-sm">
                     <div className="flex items-center gap-2 mb-2">
                       <SparklesIcon className="h-4 w-4 text-primary-500" />
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">NexOps</span>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">NextSight AI</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-gray-500 dark:text-gray-400">v1.2.0</span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400">v1.4.0</span>
                       <span className="flex items-center gap-1 text-[10px] text-success-500">
                         <span className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse" />
                         Latest
@@ -413,10 +412,10 @@ export default function Layout({ children }: LayoutProps) {
                     className="overflow-hidden"
                   >
                     <span className="text-lg font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent whitespace-nowrap">
-                      NexOps
+                      NextSight AI
                     </span>
                     <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium tracking-wider uppercase whitespace-nowrap">
-                      Command Center
+                      DevOps Dashboard
                     </p>
                   </motion.div>
                 )}
@@ -464,7 +463,7 @@ export default function Layout({ children }: LayoutProps) {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <SparklesIcon className="h-4 w-4 text-primary-500" />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">NexOps</span>
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">NextSight AI</span>
                       </div>
                       <motion.button
                         whileHover={{ rotate: 180 }}
@@ -476,7 +475,7 @@ export default function Layout({ children }: LayoutProps) {
                       </motion.button>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">v1.2.0</span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">v1.4.0</span>
                       <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success-500/10 text-[10px] text-success-600 dark:text-success-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse" />
                         Up to date
