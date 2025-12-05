@@ -107,6 +107,11 @@ jobs:
     name: OSSF Scorecard
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
 
     steps:
       - name: Checkout code

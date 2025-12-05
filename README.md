@@ -8,7 +8,7 @@
 [![Security](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml/badge.svg)](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml)
 [![CodeQL](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/gauravtayade11/nexops/security/code-scanning)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/gauravtayade11/nexops/releases)
+[![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)](https://github.com/gauravtayade11/nexops/releases)
 [![GitHub stars](https://img.shields.io/github/stars/gauravtayade11/nexops?style=social)](https://github.com/gauravtayade11/nexops/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/gauravtayade11/nexops?style=social)](https://github.com/gauravtayade11/nexops/network/members)
 
