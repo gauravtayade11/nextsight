@@ -1,0 +1,92 @@
+site_name: NextSight AI Documentation
+site_description: AI-powered Kubernetes management platform with real-time monitoring, security scanning, and intelligent insights
+site_author: Gaurav Tayade
+site_url: https://gauravtayade11.github.io/nexops/
+
+repo_name: gauravtayade11/nexops
+repo_url: https://github.com/gauravtayade11/nexops
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/kubernetes
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/gauravtayade11/nexops
+  version:
+    provider: mike
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Features:
+    - Dashboard: features/dashboard.md
+    - Kubernetes Management: features/kubernetes.md
+    - Security Posture: features/security.md
+    - AI Assistant: features/ai-assistant.md
+    - Cost Management: features/cost.md
+    - Pod Terminal: features/terminal.md
+  - Deployment:
+    - Docker Compose: deployment/docker-compose.md
+    - Kubernetes: deployment/kubernetes.md
+    - Helm Chart: deployment/helm.md
+  - API Reference:
+    - Overview: api/overview.md
+    - Kubernetes API: api/kubernetes.md
+    - Security API: api/security.md
+    - AI API: api/ai.md
+  - Contributing:
+    - Development Setup: contributing/development.md
+    - Code Style: contributing/code-style.md
+    - Pull Requests: contributing/pull-requests.md
+  - Changelog: changelog.md
