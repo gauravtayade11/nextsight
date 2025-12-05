@@ -505,11 +505,12 @@ async def ai_health():
             services_status["jenkins"] = "disconnected"
 
         try:
-            releases = await helm_service.list_releases()
+            await helm_service.list_releases()
             services_status["helm"] = "connected"
         except Exception:
             services_status["helm"] = "disconnected"
 
         return {"status": "available", "model": settings.GEMINI_MODEL, "services": services_status}
     except Exception as e:
-        return {"status": "error", "reason": str(e)}
+        logger.error(f"AI health check error: {type(e).__name__}")
+        return {"status": "error", "reason": "Internal service error"}

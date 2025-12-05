@@ -1,8 +1,11 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+
+logger = logging.getLogger(__name__)
 
 from app.schemas.gitflow import Environment
 from app.schemas.selfservice import (
@@ -69,8 +72,9 @@ async def get_service(namespace: str, service_name: str):
                     allowed_actions=[ActionType.DEPLOY, ActionType.ROLLBACK, ActionType.SCALE, ActionType.RESTART],
                     health_status="healthy" if dep.ready_replicas == dep.replicas else "degraded",
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        # Log error without user-controlled input to prevent log injection
+        logger.warning("Error fetching service from catalog: %s", type(e).__name__)
 
     raise HTTPException(status_code=404, detail="Service not found")
 

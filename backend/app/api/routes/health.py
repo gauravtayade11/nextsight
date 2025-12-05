@@ -1,9 +1,11 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -28,16 +30,16 @@ async def readiness_check():
 
         kubernetes_service._initialize()
         checks["kubernetes"] = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Kubernetes not ready: {type(e).__name__}")
 
     try:
         from app.services.jenkins_service import jenkins_service
 
         jenkins_service._initialize()
         checks["jenkins"] = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Jenkins not ready: {type(e).__name__}")
 
     if settings.ANTHROPIC_API_KEY:
         checks["ai"] = True

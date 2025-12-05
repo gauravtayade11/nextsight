@@ -219,9 +219,23 @@ export default function PodLogsViewer({ pod, onClose }: PodLogsViewerProps) {
   }
 
   function highlightSearch(text: string) {
-    if (!searchTerm) return text;
-    const regex = new RegExp(`(${searchTerm})`, 'gi');
-    return text.replace(regex, '<mark class="bg-yellow-300">$1</mark>');
+    // Escape HTML entities to prevent XSS
+    const escapeHtml = (str: string) =>
+      str.replace(/&/g, '&amp;')
+         .replace(/</g, '&lt;')
+         .replace(/>/g, '&gt;')
+         .replace(/"/g, '&quot;')
+         .replace(/'/g, '&#039;');
+
+    const escapedText = escapeHtml(text);
+    if (!searchTerm) return escapedText;
+
+    // Escape regex special characters in search term
+    const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safeSearchTerm = escapeRegex(escapeHtml(searchTerm));
+
+    const regex = new RegExp(`(${safeSearchTerm})`, 'gi');
+    return escapedText.replace(regex, '<mark class="bg-yellow-300">$1</mark>');
   }
 
   function handleStreamingModeChange(enabled: boolean) {

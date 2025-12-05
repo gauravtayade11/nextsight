@@ -270,7 +270,6 @@ async def websocket_pod_exec(
             # Create tasks for reading from PTY and WebSocket
             async def read_from_pty():
                 """Read output from PTY and send to WebSocket."""
-                loop = asyncio.get_event_loop()
                 while True:
                     try:
                         # Use select to check if data is available
@@ -322,8 +321,8 @@ async def websocket_pod_exec(
 
                     except WebSocketDisconnect:
                         break
-                    except Exception as e:
-                        logger.error(f"Error reading from WebSocket: {e}")
+                    except Exception:
+                        logger.error("Error reading from WebSocket")
                         break
 
             # Run both tasks concurrently

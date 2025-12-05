@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "NexOps Center"
-    APP_VERSION: str = "1.3.0"
+    APP_VERSION: str = "1.3.1"
     DEBUG: bool = False
     API_PREFIX: str = "/api/v1"
 
