@@ -729,28 +729,114 @@ function WorkloadDrawer({
               </div>
             ) : aiAnalysis ? (
               <>
+                {/* Root Cause Section - "Why is this unhealthy?" */}
                 {aiAnalysis.summary && (
-                  <div className="p-3 rounded-lg bg-gray-50 dark:bg-slate-800/50 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    {aiAnalysis.summary}
+                  <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-500/10 dark:to-orange-500/10 border-2 border-red-200 dark:border-red-500/20">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-red-100 dark:bg-red-500/20">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                          🔍 Why is this unhealthy?
+                        </h4>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                          {aiAnalysis.summary}
+                        </p>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <div className="p-2 rounded-lg bg-white dark:bg-slate-800/50">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Health Score</p>
+                            <p className={`text-sm font-semibold ${
+                              aiAnalysis.health_score >= 80 ? 'text-emerald-600 dark:text-emerald-400' :
+                              aiAnalysis.health_score >= 60 ? 'text-amber-600 dark:text-amber-400' :
+                              'text-red-600 dark:text-red-400'
+                            }`}>
+                              {aiAnalysis.health_score}/100
+                            </p>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white dark:bg-slate-800/50">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Issues Found</p>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {aiAnalysis.fixes.length}
+                            </p>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white dark:bg-slate-800/50">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Auto-fixable</p>
+                            <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                              {aiAnalysis.fixes.filter(f => f.auto_fixable).length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
-                {aiAnalysis.fixes.map((fix, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="p-4 rounded-xl bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-500/5 dark:to-blue-500/5 border border-purple-200/30 dark:border-purple-500/20"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{fix.title}</p>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-400">
-                            {fix.category.replace('_', ' ')}
+
+                {/* Fixes Section */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <SparklesIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Recommended Fixes
+                  </h4>
+                  {aiAnalysis.fixes.map((fix, index) => {
+                    // Estimate fix time based on category
+                    const estimatedTime = fix.auto_fixable ? '< 1 min' :
+                                         fix.category === 'security' ? '5-10 min' :
+                                         fix.category === 'performance' ? '10-15 min' : '2-5 min';
+
+                    // Determine risk level
+                    const riskLevel = fix.severity === 'high' ? 'High Impact' :
+                                     fix.severity === 'medium' ? 'Medium Impact' : 'Low Impact';
+
+                    const riskColor = fix.severity === 'high' ? 'text-red-600 dark:text-red-400' :
+                                     fix.severity === 'medium' ? 'text-amber-600 dark:text-amber-400' :
+                                     'text-blue-600 dark:text-blue-400';
+
+                    return (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="p-4 rounded-xl bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-500/5 dark:to-blue-500/5 border border-purple-200/30 dark:border-purple-500/20"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">{fix.title}</p>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-400">
+                                {fix.category.replace('_', ' ')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">{fix.description}</p>
+
+                            {/* Expected Outcome & Metadata */}
+                            <div className="flex items-center gap-3 text-xs">
+                              <div className="flex items-center gap-1">
+                                <ClockIcon className="h-3 w-3 text-gray-400" />
+                                <span className="text-gray-500 dark:text-gray-400">Est. {estimatedTime}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className={`font-medium ${riskColor}`}>{riskLevel}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${severityColors[fix.severity]}`}>
+                            {fix.severity.toUpperCase()}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{fix.description}</p>
+
+                        {/* Expected Outcome Section */}
+                        <div className="mb-3 p-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20">
+                          <p className="text-xs text-blue-900 dark:text-blue-300">
+                            <span className="font-semibold">Expected Outcome:</span> {
+                              fix.category === 'security' ? 'Improved security posture and reduced attack surface' :
+                              fix.category === 'performance' ? 'Better resource utilization and response times' :
+                              fix.category === 'reliability' ? 'Increased uptime and fault tolerance' :
+                              'Adherence to Kubernetes best practices'
+                            }
+                          </p>
+                        </div>
                         {fix.fix_yaml && (
                           <details className="mt-2">
                             <summary className="text-xs text-purple-600 dark:text-purple-400 cursor-pointer hover:underline">
@@ -766,21 +852,17 @@ function WorkloadDrawer({
                             $ {fix.kubectl_command}
                           </div>
                         )}
-                      </div>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${severityColors[fix.severity]}`}>
-                        {fix.severity.toUpperCase()}
-                      </span>
-                    </div>
-                    {fix.auto_fixable && (
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-500 text-white hover:bg-purple-600"
-                      >
-                        Apply Fix
-                      </motion.button>
-                    )}
-                  </motion.div>
+
+                        {fix.auto_fixable && (
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-500 text-white hover:bg-purple-600"
+                          >
+                            Apply Fix
+                          </motion.button>
+                        )}
+                      </motion.div>
                 ))}
               </>
             ) : (
