@@ -1,7 +1,7 @@
-# NextSight AI v1.4.0 → v1.5.0 Enhancement Plan
+# NextSight AI v1.4.0 Enhancement Plan
 ## Deepening Existing Features (No New Sections)
 
-> **Goal**: Transform NextSight from a monitoring tool into an intelligent operations platform by enhancing what already exists.
+> **Goal**: Transform NextSight from a monitoring tool into an intelligent operations platform by enhancing what already exists in v1.4.0.
 
 ---
 
@@ -565,11 +565,11 @@ Role: Developer
 
 ---
 
-## 🎯 End Goal
+## 🎯 End Goal (v1.4.0)
 
-**Before**: NextSight is a Kubernetes dashboard with some AI features.
+**Current**: NextSight v1.4.0 is a Kubernetes dashboard with AI features.
 
-**After**: NextSight is an intelligent operations platform that:
+**Enhanced v1.4.0**: NextSight is an intelligent operations platform that:
 - Tells you **what needs attention RIGHT NOW**
 - Explains **why** things are failing in plain English
 - Provides **safe, tested fixes** with one click
