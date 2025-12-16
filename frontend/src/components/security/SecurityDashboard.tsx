@@ -663,6 +663,46 @@ export default function SecurityDashboard() {
     }
   };
 
+  // Generate plain English explanations for security findings
+  const getPlainEnglishExplanation = (finding: SecurityFinding) => {
+    const typeExplanations: Record<string, { explanation: string; businessImpact: string; complianceRisk: string }> = {
+      'vulnerability': {
+        explanation: `This container image has a known security vulnerability (${finding.cve_id || 'CVE'}). Think of it like running software with a known bug that hackers can exploit to break into your system.`,
+        businessImpact: 'Attackers could use this vulnerability to steal data, disrupt services, or gain unauthorized access to your applications.',
+        complianceRisk: 'May violate PCI-DSS, SOC 2, HIPAA, and ISO 27001 requirements for vulnerability management.'
+      },
+      'misconfiguration': {
+        explanation: 'This resource is configured in a way that creates security risks. It\'s like leaving a door unlocked or a window open in your house.',
+        businessImpact: 'Increases the attack surface and makes it easier for malicious actors to compromise your infrastructure.',
+        complianceRisk: 'May violate CIS Kubernetes Benchmarks and security configuration standards required by major compliance frameworks.'
+      },
+      'rbac': {
+        explanation: 'This resource has excessive permissions that violate the principle of least privilege. It\'s like giving a janitor the master key to every office.',
+        businessImpact: 'If compromised, attackers could gain elevated privileges and access sensitive resources they shouldn\'t have access to.',
+        complianceRisk: 'Violates SOC 2, ISO 27001, and PCI-DSS requirements for access control and least privilege.'
+      },
+      'network_policy': {
+        explanation: 'This workload lacks proper network segmentation. It\'s like having no doors or walls between rooms in a building.',
+        businessImpact: 'Attackers who compromise one component can easily move laterally to access other services and data.',
+        complianceRisk: 'May violate PCI-DSS network segmentation requirements and zero-trust architecture principles.'
+      },
+      'secrets': {
+        explanation: 'Sensitive information (passwords, API keys, tokens) is exposed or improperly stored. It\'s like writing your password on a sticky note.',
+        businessImpact: 'Exposed credentials can lead to data breaches, unauthorized access, and complete system compromise.',
+        complianceRisk: 'Critical violation of SOC 2, HIPAA, PCI-DSS, and GDPR requirements for secrets management.'
+      },
+      'default': {
+        explanation: 'This security issue could put your cluster and applications at risk. It represents a gap between your current configuration and security best practices.',
+        businessImpact: 'May allow unauthorized access, data breaches, or service disruptions if exploited by malicious actors.',
+        complianceRisk: 'Could violate security requirements in major compliance frameworks including SOC 2, ISO 27001, and industry-specific regulations.'
+      }
+    };
+
+    const findingType = finding.type.toLowerCase();
+    const matchedType = Object.keys(typeExplanations).find(key => findingType.includes(key));
+    return typeExplanations[matchedType || 'default'];
+  };
+
   const getRiskBadgeColor = (level: string) => {
     switch (level.toLowerCase()) {
       case 'critical': return 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400';
@@ -1271,8 +1311,44 @@ export default function SecurityDashboard() {
                 </div>
 
                 <div className="space-y-4">
+                  {/* Plain English Explanation */}
+                  {(() => {
+                    const plainEnglish = getPlainEnglishExplanation(selectedFinding);
+                    return (
+                      <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-200 dark:border-blue-500/20">
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-500/20">
+                            <InformationCircleIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                              💡 What does this mean?
+                            </h4>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                              {plainEnglish.explanation}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2 mt-3 pt-3 border-t border-blue-200 dark:border-blue-500/20">
+                          <div>
+                            <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">📊 Business Impact:</p>
+                            <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                              {plainEnglish.businessImpact}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">📋 Compliance Risk:</p>
+                            <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                              {plainEnglish.complianceRisk}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Description</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Technical Details</h4>
                     <p className="text-gray-600 dark:text-gray-400">{selectedFinding.description}</p>
                   </div>
 
