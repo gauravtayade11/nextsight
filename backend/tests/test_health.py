@@ -56,5 +56,5 @@ class TestAPIStructure:
         response = test_client.get("/openapi.json")
         data = response.json()
 
-        assert data["info"]["title"] == "NexOps Center"
+        assert data["info"]["title"] == "NextSight Center"
         assert "version" in data["info"]

@@ -6,6 +6,7 @@ import {
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { incidentsApi } from '../../services/api';
+import { logger } from '../../utils/logger';
 import type { Incident, IncidentSeverity, IncidentStatus } from '../../types';
 
 export default function IncidentList() {
@@ -28,7 +29,7 @@ export default function IncidentList() {
       });
       setIncidents(res.data);
     } catch (error) {
-      console.error('Failed to fetch incidents:', error);
+      logger.error('Failed to fetch incidents', error);
     } finally {
       setLoading(false);
     }
@@ -40,7 +41,7 @@ export default function IncidentList() {
       setShowCreateModal(false);
       fetchIncidents();
     } catch (error) {
-      console.error('Failed to create incident:', error);
+      logger.error('Failed to create incident', error);
     }
   }
 

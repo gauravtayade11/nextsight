@@ -4,7 +4,11 @@ The NextSight AI dashboard provides a comprehensive view of your Kubernetes clus
 
 ## Overview
 
-![Dashboard Overview](../images/HomePage.png)
+### Real-Time Cluster Monitoring
+
+![Dashboard - Cluster health overview with real-time metrics and AI-powered insights](../images/dashboard-overview.png)
+
+*Complete cluster overview showing pod status, resource utilization, and actionable AI recommendations in a unified dashboard*
 
 ## Key Metrics
 
@@ -23,6 +27,14 @@ The NextSight AI dashboard provides a comprehensive view of your Kubernetes clus
 - **Events Timeline** - Latest Kubernetes events
 - **Deployments** - Recent deployment activities
 - **Alerts** - Active warnings and errors
+
+## AI-Powered Insights
+
+### Actionable Insights Card
+
+![Dashboard - AI-powered actionable insights card with recommendations](../images/dashboard-insights.png)
+
+*AI automatically analyzes cluster health and provides proactive recommendations with one-click actions*
 
 ## Widgets
 

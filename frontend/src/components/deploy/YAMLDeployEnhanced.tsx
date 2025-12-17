@@ -1057,7 +1057,7 @@ export default function YAMLDeployEnhanced() {
                       <li className="flex items-start gap-2">
                         <span className="text-amber-600 dark:text-amber-400">⚠</span>
                         <span className="text-amber-700 dark:text-amber-400">
-                          Deployment took >{(deploySummary.duration / 1000).toFixed(1)}s - consider adding readiness probes for zero-downtime deployments
+                          Deployment took {'>'}{(deploySummary.duration / 1000).toFixed(1)}s - consider adding readiness probes for zero-downtime deployments
                         </span>
                       </li>
                     )}

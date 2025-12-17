@@ -11,6 +11,7 @@ import {
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import { gitflowApi, kubernetesApi } from '../../services/api';
+import { logger } from '../../utils/logger';
 import type { Release, ReleaseStatus, Environment } from '../../types';
 
 export default function ReleaseManager() {
@@ -30,7 +31,7 @@ export default function ReleaseManager() {
       const res = await gitflowApi.listReleases(undefined, 50);
       setReleases(res.data.releases);
     } catch (error) {
-      console.error('Failed to fetch releases:', error);
+      logger.error('Failed to fetch releases', error);
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,7 @@ export default function ReleaseManager() {
       setShowCreateModal(false);
       await fetchReleases();
     } catch (error) {
-      console.error('Failed to create release:', error);
+      logger.error('Failed to create release', error);
     }
   }
 
@@ -51,7 +52,7 @@ export default function ReleaseManager() {
       await gitflowApi.approveRelease(id, 'self-service');
       await fetchReleases();
     } catch (error) {
-      console.error('Failed to approve release:', error);
+      logger.error('Failed to approve release', error);
     }
   }
 
@@ -60,7 +61,7 @@ export default function ReleaseManager() {
       await gitflowApi.finishRelease(id);
       await fetchReleases();
     } catch (error) {
-      console.error('Failed to finish release:', error);
+      logger.error('Failed to finish release', error);
     }
   }
 
@@ -70,7 +71,7 @@ export default function ReleaseManager() {
       setDeployModal(null);
       await fetchReleases();
     } catch (error) {
-      console.error('Failed to deploy release:', error);
+      logger.error('Failed to deploy release', error);
     }
   }
 

@@ -154,7 +154,7 @@ export interface ChatResponse {
 
 // Proactive Insights types
 export type InsightSeverity = 'critical' | 'high' | 'medium' | 'low';
-export type InsightCategory = 'reliability' | 'security' | 'performance' | 'cost';
+export type InsightCategory = 'reliability' | 'security' | 'performance' | 'cost' | 'efficiency';
 
 export interface ProactiveInsight {
   id: string;

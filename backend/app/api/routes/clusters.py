@@ -71,6 +71,41 @@ async def get_cluster_health(cluster_id: str):
     return health
 
 
+@router.post("/{cluster_id}/test")
+async def test_cluster_connection(cluster_id: str):
+    """Test connection to a specific cluster."""
+    result = await cluster_service.test_connection(cluster_id)
+    return result
+
+
+@router.put("/{cluster_id}")
+async def update_cluster(cluster_id: str, request: AddClusterRequest, current_user=Depends(require_role("admin"))):
+    """Update a cluster configuration. Admin only."""
+    cluster_config = ClusterConfig(
+        id=request.id,
+        name=request.name,
+        context=request.context,
+        kubeconfig_path=request.kubeconfig_path,
+        kubeconfig_content=request.kubeconfig_content,
+        is_default=request.is_default,
+        auth_type=request.auth_type,
+        api_server=request.api_server,
+        bearer_token=request.bearer_token,
+        ca_cert=request.ca_cert,
+        skip_tls_verify=request.skip_tls_verify,
+    )
+
+    success = await cluster_service.update_cluster(cluster_id, cluster_config)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Cluster not found: {cluster_id}")
+
+    cluster = await cluster_service.get_cluster(request.id)
+    if not cluster:
+        raise HTTPException(status_code=500, detail="Failed to retrieve updated cluster")
+
+    return cluster
+
+
 @router.post("", response_model=ClusterInfo)
 async def add_cluster(request: AddClusterRequest, current_user=Depends(require_role("admin"))):
     """Add a new cluster configuration. Admin only."""
@@ -79,7 +114,13 @@ async def add_cluster(request: AddClusterRequest, current_user=Depends(require_r
         name=request.name,
         context=request.context,
         kubeconfig_path=request.kubeconfig_path,
+        kubeconfig_content=request.kubeconfig_content,
         is_default=request.is_default,
+        auth_type=request.auth_type,
+        api_server=request.api_server,
+        bearer_token=request.bearer_token,
+        ca_cert=request.ca_cert,
+        skip_tls_verify=request.skip_tls_verify,
     )
 
     success = await cluster_service.add_cluster(cluster_config)

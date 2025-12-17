@@ -21,7 +21,7 @@ spec:
       serviceAccountName: nexops
       containers:
         - name: backend
-          image: nexops-backend:1.0.0
+          image: nexops-backend:1.4.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
@@ -73,7 +73,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: nexops-frontend:1.0.0
+          image: nexops-frontend:1.4.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

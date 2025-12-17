@@ -8,7 +8,7 @@ global:
 backend:
   replicaCount: 1
   image:
-    repository: nexops-backend
+    repository: nextsight-backend
     tag: ""  # Defaults to global.imageTag
     pullPolicy: IfNotPresent
   service:
@@ -30,14 +30,14 @@ backend:
   #  - name: GEMINI_API_KEY
   #    valueFrom:
   #      secretKeyRef:
-  #        name: nexops-secrets
+  #        name: nextsight-secrets
   #        key: gemini-api-key
 
 # Frontend configuration
 frontend:
   replicaCount: 1
   image:
-    repository: nexops-frontend
+    repository: nextsight-frontend
     tag: ""  # Defaults to global.imageTag
     pullPolicy: IfNotPresent
   service:
@@ -59,7 +59,7 @@ ingress:
     # kubernetes.io/ingress.class: nginx
     # cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
-    - host: nexops.local
+    - host: nextsight.local
       paths:
         - path: /
           pathType: Prefix
@@ -71,9 +71,9 @@ ingress:
           pathType: Prefix
           service: backend
   tls: []
-  #  - secretName: nexops-tls
+  #  - secretName: nextsight-tls
   #    hosts:
-  #      - nexops.local
+  #      - nextsight.local
 
 # Service Account
 serviceAccount:
@@ -127,4 +127,4 @@ tolerations: []
 affinity: {}
 
 # Namespace
-namespace: nexops
+namespace: nextsight

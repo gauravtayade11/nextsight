@@ -12,6 +12,12 @@ class ClusterStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
+class AuthType(str, Enum):
+    KUBECONFIG = "kubeconfig"
+    TOKEN = "token"
+    IN_CLUSTER = "in_cluster"
+
+
 class ClusterConfig(BaseModel):
     """Configuration for a Kubernetes cluster."""
 
@@ -19,9 +25,16 @@ class ClusterConfig(BaseModel):
     name: str = Field(..., description="Display name for the cluster")
     context: Optional[str] = Field(None, description="Kubeconfig context name")
     kubeconfig_path: Optional[str] = Field(None, description="Path to kubeconfig file")
+    kubeconfig_content: Optional[str] = Field(None, description="Raw kubeconfig YAML content")
     in_cluster: bool = Field(False, description="Whether running in-cluster")
     host_override: Optional[str] = Field(None, description="Host override for Docker Desktop")
     is_default: bool = Field(False, description="Whether this is the default cluster")
+    # Token-based authentication
+    auth_type: AuthType = Field(AuthType.KUBECONFIG, description="Authentication type")
+    api_server: Optional[str] = Field(None, description="Kubernetes API server URL")
+    bearer_token: Optional[str] = Field(None, description="Service account bearer token")
+    ca_cert: Optional[str] = Field(None, description="CA certificate (base64 encoded)")
+    skip_tls_verify: bool = Field(False, description="Skip TLS certificate verification")
 
 
 class ClusterInfo(BaseModel):
@@ -90,7 +103,14 @@ class AddClusterRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Display name")
     context: Optional[str] = Field(None, description="Kubeconfig context name")
     kubeconfig_path: Optional[str] = Field(None, description="Path to kubeconfig file")
+    kubeconfig_content: Optional[str] = Field(None, description="Raw kubeconfig YAML content (for upload/paste)")
     is_default: bool = Field(False, description="Set as default cluster")
+    # Token-based authentication
+    auth_type: AuthType = Field(AuthType.KUBECONFIG, description="Authentication type")
+    api_server: Optional[str] = Field(None, description="Kubernetes API server URL (required for token auth)")
+    bearer_token: Optional[str] = Field(None, description="Service account bearer token")
+    ca_cert: Optional[str] = Field(None, description="CA certificate (base64 encoded)")
+    skip_tls_verify: bool = Field(False, description="Skip TLS certificate verification")
 
 
 class ClusterContextInfo(BaseModel):

@@ -759,6 +759,11 @@ export const aiApi = {
   }) => api.post<WorkloadAnalysisResponse>('/ai/workload/analyze', request),
   getProactiveInsights: () =>
     api.get<import('../types').ProactiveInsightsResponse>('/ai/insights/proactive'),
+  summarizeLogs: (namespace?: string, timeWindowMinutes = 10) =>
+    api.post<{ summary: string; error_count: number; time_window: string; key_issues: string[]; success: boolean }>('/ai/summarize-logs', {
+      namespace,
+      time_window_minutes: timeWindowMinutes,
+    }),
 };
 
 // Settings & Integrations API

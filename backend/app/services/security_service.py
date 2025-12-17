@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -12,6 +13,8 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from app.schemas.security import (  # New schemas for RBAC, Network Policies, and Trends
     ComplianceCheck,
     ImageScanResult,
@@ -93,7 +96,7 @@ def _get_k8s_client() -> client.CoreV1Api:
 
         return client.CoreV1Api()
     except Exception as e:
-        print(f"Failed to initialize Kubernetes client: {e}")
+        logger.error(f"Failed to initialize Kubernetes client: {e}")
         raise
 
 
@@ -144,7 +147,7 @@ class SecurityService:
                 last_updated=datetime.utcnow(),
             )
         except Exception as e:
-            print(f"Error getting security posture: {e}")
+            logger.error(f"Error getting security posture: {e}")
             raise
 
     async def scan_cluster_security(self, cluster_id: str = "default") -> List[SecurityFinding]:
@@ -245,9 +248,9 @@ class SecurityService:
             self.findings_cache[cluster_id] = findings
 
         except ApiException as e:
-            print(f"Kubernetes API error: {e}")
+            logger.error(f"Kubernetes API error: {e}")
         except Exception as e:
-            print(f"Error scanning cluster security: {e}")
+            logger.error(f"Error scanning cluster security: {e}")
 
         return findings
 
@@ -313,7 +316,7 @@ class SecurityService:
                 )
 
         except Exception as e:
-            print(f"Error checking pod security: {e}")
+            logger.error(f"Error checking pod security: {e}")
 
         return checks
 
@@ -395,7 +398,7 @@ class SecurityService:
             )
 
         except Exception as e:
-            print(f"Error running compliance checks: {e}")
+            logger.error(f"Error running compliance checks: {e}")
 
         return checks
 
@@ -411,7 +414,7 @@ class SecurityService:
         if not force_scan and cache_key in _scan_cache:
             cached_result, cached_time = _scan_cache[cache_key]
             if datetime.utcnow() - cached_time < timedelta(minutes=CACHE_TTL_MINUTES):
-                print(f"Using cached image scan results (age: {datetime.utcnow() - cached_time})")
+                logger.debug(f"Using cached image scan results (age: {datetime.utcnow() - cached_time})")
                 return cached_result
 
         results = []
@@ -455,14 +458,14 @@ class SecurityService:
                         results.append(result)
                         _image_scan_cache[image] = (result, datetime.utcnow())
                 except Exception as e:
-                    print(f"Error scanning image {image}: {e}")
+                    logger.error(f"Error scanning image {image}: {e}")
                     _failed_images[image] = datetime.utcnow()
 
             # Cache the full results
             _scan_cache[cache_key] = (results, datetime.utcnow())
 
         except Exception as e:
-            print(f"Error scanning container images: {e}")
+            logger.error(f"Error scanning container images: {e}")
 
         return results
 
@@ -474,10 +477,10 @@ class SecurityService:
                 # Find Trivy binary
                 trivy_binary = _find_trivy_binary()
                 if not trivy_binary:
-                    print("Trivy not found. Install Trivy for vulnerability scanning: https://trivy.dev/")
+                    logger.warning("Trivy not found. Install Trivy for vulnerability scanning: https://trivy.dev/")
                     return None
 
-                print(f"Scanning image {image} with Trivy at {trivy_binary}...")
+                logger.info(f"Scanning image {image} with Trivy at {trivy_binary}")
 
                 # Run Trivy scan with --skip-db-update to avoid DB lock issues
                 # Only update DB on the first scan
@@ -508,20 +511,20 @@ class SecurityService:
                         or "MANIFEST_UNKNOWN" in stderr_text
                         or "No such image" in stderr_text
                     ):
-                        print(f"Image not found (skipping): {image}")
+                        logger.warning(f"Image not found (skipping): {image}")
                         _failed_images[image] = datetime.utcnow()
                         return None
 
                     # Check for DB lock issues
                     if "may be in use by another process" in stderr_text or "timeout" in stderr_text.lower():
-                        print(f"Trivy DB busy, will retry later: {image}")
+                        logger.warning(f"Trivy DB busy, will retry later: {image}")
                         return None
 
-                    print(f"Trivy scan failed for {image}: {stderr_text}")
+                    logger.error(f"Trivy scan failed for {image}: {stderr_text}")
                     _failed_images[image] = datetime.utcnow()
                     return None
 
-                print(f"Trivy scan completed for {image}")
+                logger.info(f"Trivy scan completed for {image}")
 
                 # Parse Trivy output
                 scan_data = json.loads(stdout.decode())
@@ -601,10 +604,10 @@ class SecurityService:
                 )
 
             except FileNotFoundError:
-                print("Trivy not found. Install Trivy for vulnerability scanning: https://trivy.dev/")
+                logger.warning("Trivy not found. Install Trivy for vulnerability scanning: https://trivy.dev/")
                 return None
             except Exception as e:
-                print(f"Error scanning image with Trivy: {e}")
+                logger.error(f"Error scanning image with Trivy: {e}")
                 return None
 
     def _calculate_vulnerability_summary(
@@ -1032,7 +1035,7 @@ class SecurityService:
                 recommendations.append("RBAC configuration follows security best practices.")
 
         except Exception as e:
-            print(f"Error analyzing RBAC: {e}")
+            logger.error(f"Error analyzing RBAC: {e}")
             recommendations.append(f"Error during RBAC analysis: {str(e)}")
 
         return RBACAnalysis(
@@ -1184,7 +1187,7 @@ class SecurityService:
                 recommendations.append("Network policy coverage is excellent!")
 
         except Exception as e:
-            print(f"Error analyzing network policies: {e}")
+            logger.error(f"Error analyzing network policies: {e}")
             recommendations.append(f"Error during analysis: {str(e)}")
 
         return NetworkPolicyCoverage(

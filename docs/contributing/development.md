@@ -12,8 +12,8 @@ Set up your local development environment for NextSight AI.
 ## Clone Repository
 
 ```bash
-git clone https://github.com/gauravtayade11/nexops.git
-cd nexops
+git clone https://github.com/gauravtayade11/nextsight.git
+cd nextsight
 ```
 
 ## Backend Setup
@@ -64,7 +64,7 @@ docker-compose up -d --build
 ## Project Structure
 
 ```
-nexops/
+nextsight/
 ├── backend/                 # FastAPI Backend
 │   ├── app/
 │   │   ├── api/routes/     # REST API endpoints
@@ -111,8 +111,8 @@ npm run lint
 make build-prod
 
 # Or manually
-docker build -t nexops-backend:latest ./backend
-docker build -t nexops-frontend:latest ./frontend
+docker build -t nextsight-backend:latest ./backend
+docker build -t nextsight-frontend:latest ./frontend
 ```
 
 ## Environment Variables

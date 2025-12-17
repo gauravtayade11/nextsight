@@ -2,6 +2,12 @@
 
 NextSight AI provides interactive terminal access to your pods directly from the browser.
 
+### Interactive Shell Access
+
+![Terminal - Interactive xterm.js terminal with pod exec and debug containers](../images/terminal.png)
+
+*Full terminal emulation with PTY support, WebSocket-based communication, and multi-container support*
+
 ## Pod Exec
 
 Execute commands inside running containers:

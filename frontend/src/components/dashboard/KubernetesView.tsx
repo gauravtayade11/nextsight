@@ -10,6 +10,7 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { kubernetesApi } from '../../services/api';
+import { logger } from '../../utils/logger';
 import type { Namespace, Pod, Deployment, K8sEvent, ClusterHealth } from '../../types';
 import PodLogsViewer from '../kubernetes/PodLogsViewer';
 import PodExecTerminal from '../kubernetes/PodExecTerminal';
@@ -52,7 +53,7 @@ export default function KubernetesView() {
       setDeployments(depsRes.data);
       setEvents(eventsRes.data);
     } catch (error) {
-      console.error('Failed to fetch K8s data:', error);
+      logger.error('Failed to fetch K8s data', error);
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ export default function KubernetesView() {
       await kubernetesApi.scale(namespace, deployment, replicas);
       await fetchData();
     } catch (error) {
-      console.error('Scale failed:', error);
+      logger.error('Scale failed', error);
     } finally {
       setActionLoading(null);
     }
@@ -76,7 +77,7 @@ export default function KubernetesView() {
       await kubernetesApi.restart(namespace, deployment);
       await fetchData();
     } catch (error) {
-      console.error('Restart failed:', error);
+      logger.error('Restart failed', error);
     } finally {
       setActionLoading(null);
     }

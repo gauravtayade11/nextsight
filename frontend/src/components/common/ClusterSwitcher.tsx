@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useCluster } from '../../contexts/ClusterContext';
+import { logger } from '../../utils/logger';
 import {
   ServerStackIcon,
   CheckIcon,
@@ -37,7 +38,7 @@ export default function ClusterSwitcher() {
       // Optionally refresh the page or trigger a global state refresh
       window.location.reload();
     } catch (error) {
-      console.error('Failed to switch cluster:', error);
+      logger.error('Failed to switch cluster', error);
     } finally {
       setSwitching(false);
     }

@@ -2,6 +2,12 @@
 
 NextSight AI provides comprehensive Kubernetes cluster management with real-time monitoring and control.
 
+### Workload Management with Health Indicators
+
+![Kubernetes - Workload management showing pods, deployments with health indicators](../images/kubernetes-workloads.png)
+
+*Manage all Kubernetes workloads with visual health indicators, quick actions, and real-time status updates*
+
 ## Resources
 
 ### Pods
@@ -95,6 +101,12 @@ kubectl rollout undo deployment <name> -n <namespace>
 
 ## Real-time Logs
 
+### Live Log Streaming
+
+![Kubernetes - Real-time pod logs with WebSocket streaming and search](../images/pod-logs.png)
+
+*Stream pod logs in real-time with WebSocket support, search functionality, and download option*
+
 Stream pod logs in real-time:
 
 1. Click on a pod
@@ -132,6 +144,12 @@ Debug distroless containers:
 Uses Kubernetes ephemeral containers feature.
 
 ## YAML Deploy
+
+### Manifest Deployment with Validation
+
+![Deploy - YAML editor with dry-run validation and deployment summary](../images/yaml-deploy.png)
+
+*Deploy Kubernetes manifests with syntax validation, dry-run mode, and comprehensive deployment summary*
 
 Apply Kubernetes manifests:
 

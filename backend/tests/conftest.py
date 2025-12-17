@@ -1,5 +1,5 @@
 """
-Pytest configuration and fixtures for NexOps backend tests.
+Pytest configuration and fixtures for NextSight backend tests.
 """
 import pytest
 import sys

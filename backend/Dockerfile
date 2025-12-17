@@ -25,8 +25,8 @@ COPY . .
 RUN chmod +x entrypoint.sh
 
 # Create non-root user
-RUN useradd -m -u 1000 nexops && chown -R nexops:nexops /app
-USER nexops
+RUN useradd -m -u 1000 nextsight && chown -R nextsight:nextsight /app
+USER nextsight
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1

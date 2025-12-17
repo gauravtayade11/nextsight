@@ -29,9 +29,9 @@ docs/api-reference
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/nexops.git
-cd nexops
-git remote add upstream https://github.com/gauravtayade11/nexops.git
+git clone https://github.com/YOUR_USERNAME/nextsight.git
+cd nextsight
+git remote add upstream https://github.com/gauravtayade11/nextsight.git
 ```
 
 ### 2. Create Branch

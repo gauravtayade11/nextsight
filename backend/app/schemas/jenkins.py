@@ -36,8 +36,8 @@ class BuildInfo(BaseModel):
     display_name: str
     description: Optional[str] = None
     triggered_by: Optional[str] = None
-    changes: List[Dict[str, Any]] = []
-    artifacts: List[str] = []
+    changes: List[Dict[str, Any]] = Field(default_factory=list)
+    artifacts: List[str] = Field(default_factory=list)
 
 
 class BuildLogResponse(BaseModel):
@@ -49,7 +49,7 @@ class BuildLogResponse(BaseModel):
 
 class TriggerBuildRequest(BaseModel):
     job_name: str
-    parameters: Dict[str, str] = {}
+    parameters: Dict[str, str] = Field(default_factory=dict)
 
 
 class TriggerBuildResponse(BaseModel):
@@ -68,7 +68,7 @@ class PipelineStage(BaseModel):
 class PipelineInfo(BaseModel):
     job_name: str
     build_number: int
-    stages: List[PipelineStage] = []
+    stages: List[PipelineStage] = Field(default_factory=list)
     total_duration: int
     status: str
 

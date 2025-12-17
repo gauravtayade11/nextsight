@@ -74,3 +74,6 @@ articles/
 # Internal planning docs
 ROADMAP.md
 RELEASE_NOTES*.md
+
+# MkDocs build output
+site/

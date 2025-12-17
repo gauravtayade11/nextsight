@@ -1,17 +1,75 @@
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: nextsight-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nextsight
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: nextsight-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: nexops-backend
+    container_name: nextsight-backend
     ports:
       - "8000:8000"
     environment:
+      # Database & Auth (Production mode)
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/nextsight
+      - USE_DATABASE_AUTH=true
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_ENABLED=true
+      # Security - CHANGE IN PRODUCTION
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key-in-production}
+      # Kubernetes
       - K8S_IN_CLUSTER=false
-      - K8S_CONFIG_PATH=/home/nexops/.kube/config
-      - K8S_HOST_OVERRIDE=kubernetes.docker.internal
+      - K8S_CONFIG_PATH=/home/nextsight/.kube/config
+      - K8S_HOST_OVERRIDE=host.docker.internal
+      # AI Provider (optional - set via .env file)
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # OAuth (optional - set via .env file)
+      - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
     volumes:
-      - ~/.kube:/home/nexops/.kube:ro  # Mount kubeconfig for local development
+      - ~/.kube:/home/nextsight/.kube:ro  # Mount kubeconfig for local development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -23,13 +81,17 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: nexops-frontend
+    container_name: nextsight-frontend
     ports:
       - "3000:80"
     depends_on:
       - backend
     restart: unless-stopped
 
+volumes:
+  postgres_data:
+  redis_data:
+
 networks:
   default:
-    name: nexops-network
+    name: nextsight-network

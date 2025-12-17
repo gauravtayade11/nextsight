@@ -43,12 +43,6 @@ POST /api/v1/ai/chat
 {"message": "Are there privileged containers?"}
 ```
 
-#### Cost
-```json
-{"message": "What are my top cost consumers?"}
-{"message": "Show cost breakdown by namespace"}
-```
-
 ## Health
 
 ### Check AI Service Health
@@ -82,7 +76,6 @@ The AI automatically detects and fetches data for:
 | services | service, svc, endpoints |
 | nodes | node, worker, master |
 | security | security, vulnerability, CVE |
-| cost | cost, spending, expensive |
 | jenkins | build, pipeline, job |
 | helm | chart, release, helm |
 

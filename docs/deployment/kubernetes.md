@@ -15,10 +15,10 @@ Deploy NextSight AI to your Kubernetes cluster.
 kubectl apply -f k8s/
 
 # Check status
-kubectl get pods -n nexops
+kubectl get pods -n nextsight
 
 # Port forward
-kubectl port-forward -n nexops svc/nexops-frontend 3000:80
+kubectl port-forward -n nextsight svc/nextsight-frontend 3000:80
 ```
 
 ## Manifests
@@ -30,7 +30,7 @@ kubectl port-forward -n nexops svc/nexops-frontend 3000:80
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: nexops
+  name: nextsight
 ```
 
 ### RBAC
@@ -42,13 +42,13 @@ NextSight AI needs cluster-wide read access:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nexops
-  namespace: nexops
+  name: nextsight
+  namespace: nextsight
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nexops-reader
+  name: nextsight-reader
 rules:
   - apiGroups: [""]
     resources: ["pods", "services", "nodes", "namespaces", "events", "configmaps"]
@@ -66,14 +66,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nexops-reader
+  name: nextsight-reader
 subjects:
   - kind: ServiceAccount
-    name: nexops
-    namespace: nexops
+    name: nextsight
+    namespace: nextsight
 roleRef:
   kind: ClusterRole
-  name: nexops-reader
+  name: nextsight-reader
   apiGroup: rbac.authorization.k8s.io
 ```
 
@@ -84,22 +84,22 @@ roleRef:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nexops-backend
-  namespace: nexops
+  name: nextsight-backend
+  namespace: nextsight
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nexops-backend
+      app: nextsight-backend
   template:
     metadata:
       labels:
-        app: nexops-backend
+        app: nextsight-backend
     spec:
-      serviceAccountName: nexops
+      serviceAccountName: nextsight
       containers:
         - name: backend
-          image: nexops-backend:latest
+          image: nextsight-backend:latest
           ports:
             - containerPort: 8000
           env:
@@ -108,7 +108,7 @@ spec:
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: nexops-secrets
+                  name: nextsight-secrets
                   key: gemini-api-key
 ```
 
@@ -119,15 +119,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: nexops-frontend
-  namespace: nexops
+  name: nextsight-frontend
+  namespace: nextsight
 spec:
   type: ClusterIP
   ports:
     - port: 80
       targetPort: 80
   selector:
-    app: nexops-frontend
+    app: nextsight-frontend
 ```
 
 ### Ingress
@@ -137,29 +137,29 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: nexops
-  namespace: nexops
+  name: nextsight
+  namespace: nextsight
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: nginx
   rules:
-    - host: nexops.example.com
+    - host: nextsight.example.com
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: nexops-frontend
+                name: nextsight-frontend
                 port:
                   number: 80
           - path: /api
             pathType: Prefix
             backend:
               service:
-                name: nexops-backend
+                name: nextsight-backend
                 port:
                   number: 8000
 ```
@@ -169,30 +169,30 @@ spec:
 Create secrets for sensitive data:
 
 ```bash
-kubectl create secret generic nexops-secrets \
+kubectl create secret generic nextsight-secrets \
   --from-literal=gemini-api-key=YOUR_API_KEY \
-  -n nexops
+  -n nextsight
 ```
 
 ## Verification
 
 ```bash
 # Check pods
-kubectl get pods -n nexops
+kubectl get pods -n nextsight
 
 # Check logs
-kubectl logs -f deployment/nexops-backend -n nexops
+kubectl logs -f deployment/nextsight-backend -n nextsight
 
 # Test connectivity
-kubectl port-forward svc/nexops-frontend 3000:80 -n nexops
+kubectl port-forward svc/nextsight-frontend 3000:80 -n nextsight
 ```
 
 ## Updating
 
 ```bash
 # Update images
-kubectl set image deployment/nexops-backend \
-  backend=nexops-backend:v1.4.0 -n nexops
+kubectl set image deployment/nextsight-backend \
+  backend=nextsight-backend:v1.4.0 -n nextsight
 
 # Or apply updated manifests
 kubectl apply -f k8s/

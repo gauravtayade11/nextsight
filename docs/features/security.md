@@ -1,10 +1,17 @@
 # Security Posture Dashboard
 
-NextSight AI provides comprehensive security scanning and analysis for your Kubernetes clusters.
+NextSight AI provides comprehensive security scanning and analysis for your Kubernetes clusters with **built-in Trivy vulnerability scanning** - no external tools required!
+
+!!! success "Built-in Security Scanning"
+    Trivy v0.58.0 is included directly in the NextSight AI Docker image. Container vulnerability scanning works immediately without any external installation, configuration, or internet connectivity (perfect for air-gapped environments).
 
 ## Security Score
 
-![Security Dashboard](../images/Security.png)
+### Comprehensive Security Dashboard
+
+![Security - Security posture dashboard with vulnerability scanning and top risks](../images/security-dashboard.png)
+
+*Complete security overview with Top 3 risks, vulnerability scans, RBAC analysis, and AI-powered remediation*
 
 ### Grading System
 
@@ -56,7 +63,15 @@ Your cluster receives a security grade based on findings:
 
 ## Vulnerability Scanning
 
-NextSight AI integrates with Trivy for container scanning:
+NextSight AI includes **Trivy v0.58.0** built directly into the backend Docker image for zero-configuration vulnerability scanning:
+
+!!! info "No Installation Required"
+    Unlike other platforms that require external Trivy installation, NextSight AI includes Trivy in the image. This means:
+
+    - ✅ Zero setup - scanning works immediately
+    - ✅ Air-gapped friendly - no external downloads needed
+    - ✅ Consistent experience - same Trivy version everywhere
+    - ✅ Faster scans - Trivy binary ready to use
 
 ### Severity Levels
 
@@ -77,6 +92,12 @@ Each vulnerability shows:
 - **CVSS Score** - Severity score
 
 ## AI-Powered Remediation
+
+### Intelligent Security Fixes
+
+![Security - AI-powered remediation with kubectl commands and YAML examples](../images/security-remediation.png)
+
+*Get AI-generated security fixes with detailed risk assessment, step-by-step kubectl commands, and prevention tips*
 
 Click **Get AI Remediation** on any finding for:
 

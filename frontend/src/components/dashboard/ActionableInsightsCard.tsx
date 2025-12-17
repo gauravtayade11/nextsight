@@ -11,6 +11,8 @@ import {
   ChevronRightIcon,
   SparklesIcon,
   CheckCircleIcon,
+  ChartBarIcon,
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import type { ProactiveInsight, InsightSeverity, InsightCategory } from '../../types';
 import GlassCard from '../common/GlassCard';
@@ -72,6 +74,10 @@ const categoryConfig: Record<InsightCategory, {
     icon: CurrencyDollarIcon,
     label: 'Cost',
   },
+  efficiency: {
+    icon: ChartBarIcon,
+    label: 'Resource Efficiency',
+  },
 };
 
 // Generate deep links based on insight category and content
@@ -81,6 +87,9 @@ function getDeepLink(insight: ProactiveInsight): string {
   }
   if (insight.category === 'cost') {
     return '/cost';
+  }
+  if (insight.category === 'efficiency') {
+    return '/optimization';
   }
   if (insight.category === 'reliability' || insight.category === 'performance') {
     // If it's a pod issue, link to kubernetes page
@@ -150,38 +159,52 @@ export default function ActionableInsightsCard({ insights, loading }: Actionable
           : 'border-blue-300 dark:border-blue-500/40'
       }`}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-xl ${
+      {/* Compact Header with Stats */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${
             criticalCount > 0
               ? 'bg-gradient-to-br from-red-500 to-red-600'
               : highCount > 0
               ? 'bg-gradient-to-br from-amber-500 to-amber-600'
               : 'bg-gradient-to-br from-blue-500 to-blue-600'
           }`}>
-            <SparklesIcon className="h-6 w-6 text-white" />
+            <SparklesIcon className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              What Needs Your Attention
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
-                AI
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+              AI Insights
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
+                LIVE
               </span>
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {criticalCount > 0 && `${criticalCount} critical`}
-              {criticalCount > 0 && highCount > 0 && ', '}
-              {highCount > 0 && `${highCount} high`}
-              {criticalCount === 0 && highCount === 0 && 'Minor issues detected'}
-            </p>
           </div>
+        </div>
+
+        {/* Compact Stats */}
+        <div className="flex items-center gap-2 text-xs">
+          {criticalCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium">
+              {criticalCount} critical
+            </span>
+          )}
+          {highCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">
+              {highCount} high
+            </span>
+          )}
+          {criticalCount === 0 && highCount === 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+              <CheckCircleIcon className="h-3 w-3" />
+              All clear
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Insights List */}
-      <div className="space-y-3">
-        {topInsights.map((insight, index) => {
+      {/* Compact Grid Layout - Show top 3 */}
+      <div className="grid grid-cols-1 gap-2">
+        {topInsights.slice(0, 3).map((insight, index) => {
           const config = severityConfig[insight.severity];
           const SeverityIcon = config.icon;
           const categoryInfo = categoryConfig[insight.category];
@@ -191,46 +214,37 @@ export default function ActionableInsightsCard({ insights, loading }: Actionable
           return (
             <motion.div
               key={insight.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.03 }}
             >
               <Link
                 to={deepLink}
-                className={`block p-4 rounded-xl border-2 ${config.border} ${config.bg} hover:shadow-md transition-all group`}
+                className={`block p-2.5 rounded-lg border ${config.border} ${config.bg} hover:shadow-sm transition-all group`}
               >
-                <div className="flex items-start gap-3">
-                  {/* Severity Icon */}
-                  <div className={`flex-shrink-0 p-2 rounded-lg ${config.bg} border ${config.border}`}>
-                    <SeverityIcon className={`h-5 w-5 ${config.color}`} />
+                <div className="flex items-center gap-2">
+                  {/* Compact Severity Indicator */}
+                  <div className={`flex-shrink-0 p-1 rounded ${config.bg}`}>
+                    <SeverityIcon className={`h-3.5 w-3.5 ${config.color}`} />
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className={`text-sm font-semibold ${config.color}`}>
-                        {insight.title}
-                      </h4>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                        <CategoryIcon className="h-3 w-3" />
-                        {categoryInfo.label}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                      {insight.description}
+                  {/* Content - Single Line */}
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className={`text-xs font-medium ${config.color} truncate flex-1`}>
+                      {insight.title}
                     </p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-500 dark:text-gray-500">
-                        💡 {insight.recommendation}
-                      </p>
-                      <ChevronRightIcon className="h-4 w-4 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
-                    </div>
+
+                    {/* Category Badge */}
+                    <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 flex items-center gap-0.5">
+                      <CategoryIcon className="h-2.5 w-2.5" />
+                      {categoryInfo.label.split(' ')[0]}
+                    </span>
+
                     {insight.auto_fixable && (
-                      <span className="inline-flex items-center gap-1 mt-2 text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium">
-                        <SparklesIcon className="h-3 w-3" />
-                        Auto-fixable
-                      </span>
+                      <SparklesIcon className="h-3 w-3 text-purple-500 flex-shrink-0" />
                     )}
+
+                    <ChevronRightIcon className="h-3 w-3 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                   </div>
                 </div>
               </Link>
@@ -238,6 +252,17 @@ export default function ActionableInsightsCard({ insights, loading }: Actionable
           );
         })}
       </div>
+
+      {/* View All Link */}
+      {topInsights.length > 3 && (
+        <Link
+          to="/optimization"
+          className="mt-2 flex items-center justify-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
+        >
+          <span>View all {topInsights.length} insights</span>
+          <ArrowRightIcon className="h-3 w-3" />
+        </Link>
+      )}
     </GlassCard>
   );
 }

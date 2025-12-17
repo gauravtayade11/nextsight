@@ -677,48 +677,6 @@ function EventItem({
   );
 }
 
-// AI Recommendation Component
-function AIRecommendation({
-  title,
-  description,
-  impact,
-  category
-}: {
-  title: string;
-  description: string;
-  impact: 'high' | 'medium' | 'low';
-  category: string;
-}) {
-  const impactColors = {
-    high: 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400',
-    medium: 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    low: 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-500/5 dark:to-blue-500/5 border border-purple-200/50 dark:border-purple-500/20"
-    >
-      <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500">
-        <SparklesIcon className="h-4 w-4 text-white" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">{title}</p>
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${impactColors[impact]}`}>
-            {impact.toUpperCase()}
-          </span>
-        </div>
-        <p className="text-xs text-gray-600 dark:text-gray-400">{description}</p>
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{category}</p>
-      </div>
-      <ChevronRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
-    </motion.div>
-  );
-}
-
 export default function Dashboard() {
   const toast = useToast();
   const { clusters, activeCluster, setActiveCluster } = useCluster();
@@ -802,21 +760,6 @@ export default function Dashboard() {
     });
   }, [events]);
 
-  // Transform AI recommendations for display
-  const aiRecommendations = useMemo(() => {
-    if (recommendations.length === 0) {
-      return [
-        { title: 'No recommendations', description: 'Your cluster is well optimized!', impact: 'low' as const, category: 'General' }
-      ];
-    }
-    return recommendations.slice(0, 3).map(rec => ({
-      title: rec.title || 'Optimization',
-      description: rec.description || 'Review this resource for optimization opportunities.',
-      impact: (rec.severity === 'critical' || rec.severity === 'high' ? 'high' :
-               rec.severity === 'medium' ? 'medium' : 'low') as 'high' | 'medium' | 'low',
-      category: rec.type || rec.resource_kind || 'Resource Optimization',
-    }));
-  }, [recommendations]);
 
   // Get current metrics for chart display
   // Use sample data when no real metrics are available for better UX
@@ -1141,32 +1084,6 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* AI Recommendations */}
-      <motion.div variants={itemVariants}>
-        <GlassCard padding="md">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <SparklesIcon className="h-4 w-4 text-purple-500" />
-              AI Recommendations
-              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full">
-                AI
-              </span>
-            </h2>
-            <Link
-              to="/optimization"
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-            >
-              View all insights
-              <ArrowRightIcon className="h-3 w-3" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {aiRecommendations.map((rec, index) => (
-              <AIRecommendation key={index} {...rec} />
-            ))}
-          </div>
-        </GlassCard>
-      </motion.div>
 
       {/* Quick Actions Hint */}
       <motion.div variants={itemVariants} className="text-center text-xs text-gray-400 dark:text-gray-500">

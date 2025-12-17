@@ -7,23 +7,23 @@ Deploy NextSight AI using the official Helm chart.
 ### From Local Chart
 
 ```bash
-helm install nexops ./charts/nexops \
-  -n nexops --create-namespace
+helm install nextsight ./charts/nexops \
+  -n nextsight --create-namespace
 ```
 
 ### With Custom Values
 
 ```bash
-helm install nexops ./charts/nexops \
-  -n nexops --create-namespace \
+helm install nextsight ./charts/nexops \
+  -n nextsight --create-namespace \
   -f values-production.yaml
 ```
 
 ### From Repository (Coming Soon)
 
 ```bash
-helm repo add nexops https://gauravtayade11.github.io/nexops/charts
-helm install nexops nexops/nexops -n nexops --create-namespace
+helm repo add nextsight https://gauravtayade11.github.io/nextsight/charts
+helm install nextsight nextsight/nextsight -n nextsight --create-namespace
 ```
 
 ## Configuration
@@ -35,7 +35,7 @@ helm install nexops nexops/nexops -n nexops --create-namespace
 backend:
   replicaCount: 1
   image:
-    repository: nexops-backend
+    repository: nextsight-backend
     tag: latest
     pullPolicy: IfNotPresent
   resources:
@@ -49,14 +49,14 @@ backend:
     - name: GEMINI_API_KEY
       valueFrom:
         secretKeyRef:
-          name: nexops-secrets
+          name: nextsight-secrets
           key: gemini-api-key
 
 # Frontend configuration
 frontend:
   replicaCount: 1
   image:
-    repository: nexops-frontend
+    repository: nextsight-frontend
     tag: latest
     pullPolicy: IfNotPresent
   resources:
@@ -74,7 +74,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
   hosts:
-    - host: nexops.local
+    - host: nextsight.local
       paths:
         - path: /
           pathType: Prefix
@@ -83,7 +83,7 @@ ingress:
 # Service account
 serviceAccount:
   create: true
-  name: nexops
+  name: nextsight
 
 # RBAC
 rbac:
@@ -99,14 +99,14 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: nexops.example.com
+    - host: nextsight.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: nexops-tls
+    - secretName: nextsight-tls
       hosts:
-        - nexops.example.com
+        - nextsight.example.com
 ```
 
 ### High Availability
@@ -131,7 +131,7 @@ database:
   external:
     host: postgres.example.com
     port: 5432
-    database: nexops
+    database: nextsight
 ```
 
 ## Operations
@@ -139,25 +139,25 @@ database:
 ### Upgrade
 
 ```bash
-helm upgrade nexops ./charts/nexops -n nexops
+helm upgrade nextsight ./charts/nexops -n nextsight
 ```
 
 ### Rollback
 
 ```bash
-helm rollback nexops 1 -n nexops
+helm rollback nextsight 1 -n nextsight
 ```
 
 ### Uninstall
 
 ```bash
-helm uninstall nexops -n nexops
+helm uninstall nextsight -n nextsight
 ```
 
 ### View Values
 
 ```bash
-helm get values nexops -n nexops
+helm get values nextsight -n nextsight
 ```
 
 ## Troubleshooting
@@ -165,19 +165,19 @@ helm get values nexops -n nexops
 ### Check Release Status
 
 ```bash
-helm status nexops -n nexops
+helm status nextsight -n nextsight
 ```
 
 ### View Manifest
 
 ```bash
-helm get manifest nexops -n nexops
+helm get manifest nextsight -n nextsight
 ```
 
 ### Debug Installation
 
 ```bash
-helm install nexops ./charts/nexops \
-  -n nexops --create-namespace \
+helm install nextsight ./charts/nextsight \
+  -n nextsight --create-namespace \
   --debug --dry-run
 ```

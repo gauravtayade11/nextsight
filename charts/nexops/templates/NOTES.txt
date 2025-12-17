@@ -1,4 +1,4 @@
-🚀 NexOps has been deployed!
+🚀 NextSight has been deployed!
 
 1. Get the application URL:
 {{- if .Values.ingress.enabled }}

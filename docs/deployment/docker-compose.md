@@ -5,8 +5,8 @@ The simplest way to run NextSight AI locally or in development.
 ## Quick Start
 
 ```bash
-git clone https://github.com/gauravtayade11/nexops.git
-cd nexops
+git clone https://github.com/gauravtayade11/nextsight.git
+cd nextsight
 docker-compose up -d
 ```
 
@@ -15,21 +15,37 @@ Access at **http://localhost:3000**
 ## docker-compose.yml
 
 ```yaml
-version: '3.8'
-
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nextsight-postgres
+    environment:
+      POSTGRES_DB: nextsight
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: nextsight-redis
+
   backend:
     build: ./backend
+    container_name: nextsight-backend
     ports:
       - "8000:8000"
     environment:
-      - K8S_CONFIG_PATH=/root/.kube/config
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/nextsight
+      - K8S_CONFIG_PATH=/home/nextsight/.kube/config
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
-      - ~/.kube:/root/.kube:ro
+      - ~/.kube:/home/nextsight/.kube:ro
+    depends_on:
+      - postgres
+      - redis
 
   frontend:
     build: ./frontend
+    container_name: nextsight-frontend
     ports:
       - "3000:80"
     depends_on:
@@ -85,8 +101,8 @@ make clean   # Remove containers and volumes
 lsof -i :3000
 lsof -i :8000
 
-# Use different ports
-docker-compose up -d -e "FRONTEND_PORT=3001"
+# Use different ports (edit docker-compose.yml)
+# Change ports mapping in frontend service
 ```
 
 ### Kubernetes Connection Issues
@@ -95,7 +111,7 @@ Ensure your kubeconfig is accessible:
 
 ```bash
 # Test kubectl access
-docker-compose exec backend kubectl get nodes
+docker-compose exec nextsight-backend kubectl get nodes
 ```
 
 ### Logs Not Streaming

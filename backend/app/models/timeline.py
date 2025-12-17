@@ -38,6 +38,6 @@ class TimelineEvent(Base, TimestampMixin):
     service_name = Column(String(255), nullable=True)
     environment = Column(String(50), nullable=True)
     user = Column(String(255), nullable=True)
-    metadata = Column(JSON, default=dict)
+    event_metadata = Column(JSON, default=dict)
     event_timestamp = Column(DateTime(timezone=True), server_default=func.now())
     related_incident_id = Column(String(36), nullable=True)

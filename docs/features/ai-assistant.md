@@ -1,6 +1,15 @@
 # AI Assistant
 
-NextSight AI includes an intelligent assistant powered by Google Gemini that understands your cluster in real-time.
+NextSight AI includes an intelligent assistant powered by your choice of AI provider (Groq, Gemini, or Claude) that understands your cluster in real-time.
+
+!!! tip "Groq Recommended"
+    We recommend Groq for blazing fast responses with a generous free tier (14,400 requests/day). Gemini and Claude are also supported for different use cases.
+
+### Intelligent Cluster Assistant
+
+![AI Assistant - Natural language chat interface with real-time cluster insights](../images/ai-assistant.png)
+
+*Ask questions in plain English and get intelligent answers powered by Groq, Gemini, or Claude with real-time cluster data*
 
 ## Overview
 
@@ -8,7 +17,6 @@ The AI assistant can answer questions about:
 
 - **Kubernetes** - Pods, deployments, services, nodes
 - **Security** - Vulnerabilities, RBAC, network policies
-- **Cost** - Resource costs, optimization
 - **Jenkins** - CI/CD pipelines, builds
 - **Helm** - Chart releases
 
@@ -16,7 +24,17 @@ The AI assistant can answer questions about:
 
 1. **Query Analysis** - Detects what data you're asking about
 2. **Data Fetch** - Retrieves real-time data from relevant services
-3. **AI Response** - Gemini generates a contextual answer
+3. **AI Response** - Your configured AI provider generates a contextual answer
+
+## Supported AI Providers
+
+| Provider | Speed | Cost | Best For |
+|----------|-------|------|----------|
+| **Groq** (Llama 3.3) | ⚡⚡⚡ Ultra-fast | Free (14.4K req/day) | General use (recommended) |
+| **Gemini** 2.0 | ⚡⚡ Fast | Free (limited) | Multimodal analysis |
+| **Claude** Sonnet 4 | ⚡⚡ Fast | Paid | Highest quality responses |
+
+See [Configuration Guide](../getting-started/configuration.md#ai-provider-setup) for setup instructions.
 
 ## Example Questions
 
@@ -36,14 +54,6 @@ The AI assistant can answer questions about:
 "Show me critical vulnerabilities"
 "Are there any privileged containers?"
 "What RBAC issues do I have?"
-```
-
-### Cost Questions
-
-```
-"What are my top cost consumers?"
-"Show me cost by namespace"
-"How can I optimize costs?"
 ```
 
 ### Jenkins Questions

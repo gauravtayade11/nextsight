@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { costApi } from '../../services/api';
+import { logger } from '../../utils/logger';
 import type { CostDashboardResponse, CostBreakdown } from '../../types';
 import {
   CurrencyDollarIcon,
@@ -12,30 +13,9 @@ import {
   InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-function SeverityBadge({ severity }: { severity: string }) {
-  const config: Record<string, { bg: string; text: string }> = {
-    high: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
-    medium: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
-    low: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
-  };
-
-  const { bg, text } = config[severity] || config.low;
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${bg} ${text}`}>
-      {severity}
-    </span>
-  );
-}
+// Import shared constants and components
+import { formatCurrency } from '../../utils/constants';
+import { SeverityBadge } from '../common/StatusBadge';
 
 function CostBreakdownBar({ costs, total }: { costs: CostBreakdown; total: number }) {
   const colors: Record<string, string> = {
@@ -97,7 +77,7 @@ export default function CostDashboard() {
       const response = await costApi.getDashboard();
       setDashboardData(response.data);
     } catch (err) {
-      console.error('Failed to load cost dashboard:', err);
+      logger.error('Failed to load cost dashboard', err);
       setError('Failed to load cost data. Please try again.');
     } finally {
       setLoading(false);
@@ -212,17 +192,17 @@ export default function CostDashboard() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-slate-700">
-        <nav className="flex -mb-px">
+      {/* Tabs - Sticky */}
+      <div className="sticky top-[72px] z-10 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 bg-gradient-to-r from-slate-50/95 via-white/95 to-slate-50/95 dark:from-slate-900/95 dark:via-slate-900/95 dark:to-slate-900/95 backdrop-blur-md border-b border-gray-200/50 dark:border-slate-700/50">
+        <nav className="flex gap-2">
           {(['overview', 'namespaces', 'recommendations'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 capitalize ${
+              className={`px-4 py-2 text-sm font-medium rounded-lg capitalize transition-all ${
                 activeTab === tab
-                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                  ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'
               }`}
             >
               {tab}

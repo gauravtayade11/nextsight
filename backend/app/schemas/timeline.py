@@ -34,7 +34,7 @@ class TimelineEventBase(BaseModel):
     service_name: Optional[str] = None
     environment: Optional[str] = None
     user: Optional[str] = None
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     event_timestamp: Optional[datetime] = None
 
 
@@ -49,7 +49,9 @@ class TimelineEventResponse(TimelineEventBase):
     updated_at: datetime
 
     class Config:
+        # Pydantic v2 uses `from_attributes`, v1 uses `orm_mode`. Enable both for compatibility.
         from_attributes = True
+        orm_mode = True
 
 
 class TimelineFilter(BaseModel):
@@ -66,6 +68,6 @@ class TimelineFilter(BaseModel):
 
 class TimelineCorrelation(BaseModel):
     incident_id: str
-    events_before: List[TimelineEventResponse] = []
-    events_during: List[TimelineEventResponse] = []
-    potential_causes: List[Dict[str, Any]] = []
+    events_before: List[TimelineEventResponse] = Field(default_factory=list)
+    events_during: List[TimelineEventResponse] = Field(default_factory=list)
+    potential_causes: List[Dict[str, Any]] = Field(default_factory=list)

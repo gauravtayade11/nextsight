@@ -11,9 +11,9 @@ interface GlassCardProps extends HTMLMotionProps<'div'> {
 
 const paddingClasses = {
   none: '',
-  sm: 'p-3',
-  md: 'p-4 lg:p-6',
-  lg: 'p-6 lg:p-8',
+  sm: 'p-2',
+  md: 'p-3',
+  lg: 'p-4',
 };
 
 const variantClasses = {
@@ -27,7 +27,7 @@ export default function GlassCard({
   children,
   className = '',
   variant = 'default',
-  padding = 'md',
+  padding = 'sm',
   hover = false,
   ...motionProps
 }: GlassCardProps) {
@@ -37,7 +37,7 @@ export default function GlassCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={hover ? { y: -2, transition: { duration: 0.2 } } : undefined}
       className={`
-        backdrop-blur-xl rounded-2xl border shadow-glass dark:shadow-glass-dark
+        backdrop-blur-xl rounded-xl border shadow-glass dark:shadow-glass-dark
         transition-all duration-300
         ${variantClasses[variant]}
         ${paddingClasses[padding]}

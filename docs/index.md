@@ -1,98 +1,179 @@
-# NextSight AI
+---
+title: Home
+description: AI-powered Kubernetes management platform with real-time monitoring, security scanning, and intelligent insights
+hide:
+  - navigation
+  - toc
+---
 
-**See your DevOps world in one intelligent view**
+<style>
+.md-content__button {
+  display: none;
+}
+</style>
 
-NextSight AI is an AI-powered Kubernetes management platform that provides real-time visibility, intelligent security insights, and complete control over your clusters. Built with FastAPI and React, it combines traditional monitoring with AI-powered analysis for smarter DevOps operations.
+<div class="hero" markdown>
+<div class="hero-content" markdown>
 
-<div class="grid cards" markdown>
+# :material-kubernetes:{ .lg } NextSight AI
 
--   :material-clock-fast:{ .lg .middle } __Set up in 5 minutes__
+## See your DevOps world in one intelligent view
 
-    ---
+AI-powered Kubernetes management platform with real-time visibility, intelligent security insights, and complete control over your clusters.
 
-    Get NextSight AI running with Docker Compose in just a few commands
+[Get Started :material-arrow-right:](getting-started/installation.md){ .md-button .md-button--primary }
+[View on GitHub :material-github:](https://github.com/gauravtayade11/nextsight){ .md-button }
 
-    [:octicons-arrow-right-24: Getting Started](getting-started/installation.md)
+</div>
+</div>
 
--   :material-kubernetes:{ .lg .middle } __Kubernetes Management__
+<div class="stats" markdown>
+<div class="stat">
+<div class="stat-value">v1.4.0</div>
+<div class="stat-label">Latest Release</div>
+</div>
+<div class="stat">
+<div class="stat-value">MIT</div>
+<div class="stat-label">License</div>
+</div>
+<div class="stat">
+<div class="stat-value">100%</div>
+<div class="stat-label">Open Source</div>
+</div>
+</div>
 
-    ---
+---
 
-    Monitor and manage your Kubernetes clusters with real-time insights
+## :material-rocket-launch: Features
 
-    [:octicons-arrow-right-24: Kubernetes Features](features/kubernetes.md)
+<div class="grid" markdown>
 
--   :material-shield-check:{ .lg .middle } __Security Posture__
+<div class="card" markdown>
+### :material-view-dashboard: Dashboard
+Real-time cluster health with live pod, node, and namespace statistics. Beautiful visualizations with dark mode support.
 
-    ---
+[:octicons-arrow-right-24: Learn more](features/dashboard.md)
+</div>
 
-    Comprehensive security scanning with AI-powered remediation
+<div class="card" markdown>
+### :material-kubernetes: Kubernetes Management
+Complete control over pods, deployments, services, and nodes. Scale, restart, and manage resources with ease.
 
-    [:octicons-arrow-right-24: Security Dashboard](features/security.md)
+[:octicons-arrow-right-24: Learn more](features/kubernetes.md)
+</div>
 
--   :material-robot:{ .lg .middle } __AI Assistant__
+<div class="card" markdown>
+### :material-shield-check: Security Posture
+Comprehensive security scanning with Trivy integration, RBAC analysis, and AI-powered remediation suggestions.
 
-    ---
+[:octicons-arrow-right-24: Learn more](features/security.md)
+</div>
 
-    Ask questions about your cluster in natural language
+<div class="card" markdown>
+### :material-robot: AI Assistant
+Ask questions about your cluster in natural language. Get intelligent insights and troubleshooting help powered by Gemini.
 
-    [:octicons-arrow-right-24: AI Features](features/ai-assistant.md)
+[:octicons-arrow-right-24: Learn more](features/ai-assistant.md)
+</div>
+
+<div class="card" markdown>
+### :material-console: Pod Terminal
+Interactive PTY-based terminal sessions inside containers. Support for debug containers in distroless images.
+
+[:octicons-arrow-right-24: Learn more](features/terminal.md)
+</div>
 
 </div>
 
-## Key Features
+---
 
-### Dashboard & Monitoring
-- **Real-time Cluster Health** - Live overview of pods, nodes, and namespace statistics
-- **Resource Metrics** - CPU and memory utilization across nodes and pods
-- **Event Timeline** - Track cluster events and anomalies
-- **Dark Mode Support** - Full dark/light theme with system preference detection
+## :material-clock-fast: Quick Start
 
-### Security & Compliance
-- **Security Score & Grade** - Overall cluster security assessment (A-F grading)
-- **Vulnerability Scanning** - Container security with Trivy integration
-- **RBAC Analysis** - Role-based access control security assessment
-- **AI-Powered Remediation** - Step-by-step fix recommendations
+Get NextSight AI running in under 5 minutes:
 
-### Interactive Terminals
-- **Pod Exec** - Interactive PTY-based terminal sessions inside containers
-- **Debug Containers** - Debug distroless/minimal containers
-- **Log Viewer** - Real-time streaming with search and filters
+=== "Docker Compose"
 
-## Quick Start
+    ```bash
+    # Clone the repository
+    git clone https://github.com/gauravtayade11/nextsight.git
+    cd nextsight
 
-```bash
-# Clone the repository
-git clone https://github.com/gauravtayade11/nexops.git
-cd nexops
+    # Start the stack
+    docker-compose up -d
 
-# Start with Docker Compose
-docker-compose up -d
+    # Access at http://localhost:3000
+    ```
 
-# Access at http://localhost:3000
-```
+=== "Kubernetes"
 
-## Screenshots
+    ```bash
+    # Apply manifests
+    kubectl apply -f k8s/
 
-### Dashboard
-![Dashboard](images/HomePage.png)
+    # Port forward to access
+    kubectl port-forward svc/nextsight-frontend 3000:80
+    ```
 
-### Kubernetes Resources
-![Kubernetes](images/Kuberntes.png)
+=== "Helm"
 
-### Security Dashboard
-![Security](images/Security.png)
+    ```bash
+    # Add the Helm repo
+    helm repo add nextsight https://gauravtayade11.github.io/nextsight
 
-## Tech Stack
+    # Install the chart
+    helm install nextsight ./charts/nexops -n nextsight --create-namespace
+    ```
 
-| Layer | Technology |
-|-------|------------|
-| Backend | FastAPI, Python 3.11, kubernetes-client |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS |
-| Container | Docker, nginx |
-| Orchestration | Kubernetes, Helm |
-| AI | Google Gemini |
+---
 
-## License
+## :material-image-multiple: Screenshots
 
-NextSight AI is released under the [MIT License](https://github.com/gauravtayade11/nexops/blob/main/LICENSE).
+<div class="grid" markdown>
+
+![Dashboard](images/dashboard.svg){ loading=lazy }
+
+![Kubernetes Resources](images/kubernetes.svg){ loading=lazy }
+
+</div>
+
+---
+
+## :material-layers: Tech Stack
+
+| Component | Technologies |
+|-----------|--------------|
+| **Backend** | :material-language-python: FastAPI, Python 3.11, kubernetes-client, WebSockets |
+| **Frontend** | :material-react: React 18, TypeScript, Vite, Tailwind CSS, xterm.js |
+| **Database** | :material-database: Redis (caching), PostgreSQL (persistence) |
+| **Container** | :material-docker: Docker, nginx |
+| **Orchestration** | :material-kubernetes: Kubernetes, Helm |
+| **Security** | :material-shield: Trivy v0.58.0 (built-in), RBAC Analysis |
+| **AI** | :material-robot: Groq (Llama 3.3), Gemini 2.0, Claude Sonnet |
+| **OAuth** | :material-login: Google, GitHub, GitLab SSO |
+
+---
+
+## :material-help-circle: What's New in v1.4.0
+
+!!! success "Latest Release Highlights"
+
+    - **AI-Powered Proactive Insights** - Automatic detection of issues before they become incidents
+    - **Trivy Built-in** - Container vulnerability scanning with no external dependencies (v0.58.0)
+    - **Smart Runbook Generation** - AI creates step-by-step incident response guides
+    - **Enhanced Security Dashboard** - Top 3 risks view with plain English explanations
+    - **Workload Health Indicators** - Visual health status for all Kubernetes resources
+    - **Performance Optimization** - Redis caching with intelligent TTLs for faster responses
+
+[:octicons-arrow-right-24: View Full Changelog](changelog.md)
+
+---
+
+## :material-license: License
+
+NextSight AI is released under the [MIT License](https://github.com/gauravtayade11/nextsight/blob/main/LICENSE).
+
+<div style="text-align: center; margin-top: 2rem;">
+
+**Built with :material-heart: by [Gaurav Tayade](https://github.com/gauravtayade11)**
+
+</div>
