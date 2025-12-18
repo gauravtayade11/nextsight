@@ -8,6 +8,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { incidentsApi } from '../../services/api';
+import { logger } from '../../utils/logger';
 import type { Incident, IncidentAnalysis, IncidentStatus } from '../../types';
 
 export default function IncidentDetail() {
@@ -28,7 +29,7 @@ export default function IncidentDetail() {
       const res = await incidentsApi.get(id!);
       setIncident(res.data);
     } catch (error) {
-      console.error('Failed to fetch incident:', error);
+      logger.error('Failed to fetch incident', error);
     } finally {
       setLoading(false);
     }
@@ -44,7 +45,7 @@ export default function IncidentDetail() {
       setAnalysis(res.data);
       await fetchIncident();
     } catch (error) {
-      console.error('Analysis failed:', error);
+      logger.error('Analysis failed', error);
     } finally {
       setAnalyzing(false);
     }
@@ -57,7 +58,7 @@ export default function IncidentDetail() {
       await incidentsApi.update(incident.id, { status });
       await fetchIncident();
     } catch (error) {
-      console.error('Update failed:', error);
+      logger.error('Update failed', error);
     } finally {
       setUpdating(false);
     }

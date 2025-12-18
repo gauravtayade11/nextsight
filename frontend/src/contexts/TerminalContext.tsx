@@ -32,7 +32,7 @@ const defaultState: TerminalState = {
   history: [
     {
       type: 'info',
-      content: 'Welcome to NexOps Terminal. Use the toggle to switch between kubectl and shell modes.',
+      content: 'Welcome to NextSight AI Terminal. Use the toggle to switch between kubectl and shell modes.',
       timestamp: new Date(),
     },
     {

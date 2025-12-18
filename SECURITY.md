@@ -13,7 +13,7 @@ We release patches for security vulnerabilities for the following versions:
 
 ## Reporting a Vulnerability
 
-We take the security of NexOps seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of NextSight seriously. If you believe you have found a security vulnerability, please report it to us as described below.
 
 ### Please DO NOT
 
@@ -23,7 +23,7 @@ We take the security of NexOps seriously. If you believe you have found a securi
 
 ### Please DO
 
-1. **Email us directly** at: security@nexops.local
+1. **Email us directly** at: security@nextsight.local
 2. Include the following in your report:
    - Type of vulnerability (e.g., SQL injection, XSS, authentication bypass)
    - Full paths of source file(s) related to the vulnerability
@@ -51,14 +51,14 @@ We take the security of NexOps seriously. If you believe you have found a securi
 
 ### Network Security
 
-- Deploy NexOps behind a reverse proxy with TLS/SSL
+- Deploy NextSight behind a reverse proxy with TLS/SSL
 - Use network policies to restrict pod-to-pod communication
 - Limit API access to trusted networks
 - Enable rate limiting on API endpoints
 
 ### Kubernetes Security
 
-- Run NexOps with a non-root user
+- Run NextSight with a non-root user
 - Use read-only file systems where possible
 - Apply Pod Security Standards (Restricted profile)
 - Regularly update Kubernetes and container images
@@ -78,9 +78,9 @@ We take the security of NexOps seriously. If you believe you have found a securi
 - Set up alerts for security-related events
 - Regularly review access logs
 
-## Security Features in NexOps
+## Security Features in NextSight
 
-NexOps includes built-in security features:
+NextSight includes built-in security features:
 
 - **Security Posture Dashboard**: Real-time security monitoring
 - **RBAC Analysis**: Identify overly permissive roles
@@ -107,8 +107,8 @@ Security updates are released as patch versions (e.g., 1.3.1) and announced via:
 
 ## Bug Bounty
 
-We currently do not have a formal bug bounty program, but we appreciate responsible disclosure and will acknowledge security researchers who help improve NexOps security.
+We currently do not have a formal bug bounty program, but we appreciate responsible disclosure and will acknowledge security researchers who help improve NextSight security.
 
 ---
 
-Thank you for helping keep NexOps and its users safe!
+Thank you for helping keep NextSight and its users safe!

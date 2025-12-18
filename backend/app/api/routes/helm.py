@@ -77,6 +77,17 @@ async def get_release_values(
     return await helm_service.get_release_values(name, namespace, all_values)
 
 
+@router.get("/releases/{namespace}/{name}/manifest")
+async def get_release_manifest(
+    namespace: str,
+    name: str,
+    current_user: UserInfo = Depends(get_current_user),
+):
+    """Get the manifest (all Kubernetes resources) for a release."""
+    manifest = await helm_service.get_release_manifest(name, namespace)
+    return {"manifest": manifest}
+
+
 @router.post("/releases", response_model=HelmOperationResult)
 async def install_release(
     request: InstallRequest,
@@ -121,6 +132,27 @@ async def uninstall_release(
     return await helm_service.uninstall(name, namespace, request)
 
 
+@router.post("/releases/{namespace}/{name}/test", response_model=HelmOperationResult)
+async def test_release(
+    namespace: str,
+    name: str,
+    timeout: int = Query(300, description="Test timeout in seconds"),
+    current_user: UserInfo = Depends(get_current_user),
+):
+    """Run tests for a Helm release."""
+    return await helm_service.test_release(name, namespace, timeout)
+
+
+@router.get("/releases/{namespace}/{name}/health")
+async def get_release_health(
+    namespace: str,
+    name: str,
+    current_user: UserInfo = Depends(get_current_user),
+):
+    """Get health status and pod information for a Helm release."""
+    return await helm_service.get_release_health(name, namespace)
+
+
 # ============== Repositories ==============
 
 
@@ -158,6 +190,17 @@ async def remove_repository(
     return {"success": True, "message": f"Repository {name} removed successfully"}
 
 
+@router.post("/repositories/update")
+async def update_repositories(
+    current_user: UserInfo = Depends(require_permission("helm:manage_repos")),
+):
+    """Update all Helm repositories."""
+    success = await helm_service.update_repositories()
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update repositories")
+    return {"success": True, "message": "All repositories updated successfully"}
+
+
 # ============== Charts ==============
 
 
@@ -171,7 +214,17 @@ async def search_charts(
     return await helm_service.search_charts(query, repository)
 
 
-@router.get("/charts/{chart}/info", response_model=ChartInfo)
+@router.get("/charts/{chart:path}/versions", response_model=List[ChartSearchResult])
+async def get_chart_versions(
+    chart: str,
+    repository: Optional[str] = Query(None, description="Filter by repository"),
+    current_user: UserInfo = Depends(get_current_user),
+):
+    """Get all available versions of a chart."""
+    return await helm_service.get_chart_versions(chart, repository)
+
+
+@router.get("/charts/{chart:path}/info", response_model=ChartInfo)
 async def get_chart_info(
     chart: str,
     repository: Optional[str] = Query(None, description="Repository URL"),
@@ -184,7 +237,7 @@ async def get_chart_info(
     return info
 
 
-@router.get("/charts/{chart}/values", response_model=Dict[str, Any])
+@router.get("/charts/{chart:path}/values", response_model=Dict[str, Any])
 async def get_chart_values(
     chart: str,
     repository: Optional[str] = Query(None, description="Repository URL"),

@@ -1,621 +1,416 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { helmApi } from '../../services/api';
-import type {
-  HelmRelease,
-  HelmReleaseHistory,
-  HelmRepository,
-  HelmChartSearchResult,
-  HelmReleaseStatus,
-} from '../../types';
+import { logger } from '../../utils/logger';
+import { useToast } from '../../contexts/ToastContext';
+import { useHelmReleases } from '../../hooks/useHelmData';
+import type { HelmRelease, HelmReleaseStatus } from '../../types';
 import {
   CubeIcon,
-  ArrowPathIcon,
-  TrashIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   MagnifyingGlassIcon,
   PlusIcon,
-  ClockIcon,
+  ArrowPathIcon,
+  EyeIcon,
+  ArrowUpTrayIcon,
+  TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ExclamationTriangleIcon,
-  ArrowUturnLeftIcon,
+  ClockIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 
-interface ReleaseDetailProps {
-  release: HelmRelease;
-  onClose: () => void;
-  onRollback: (revision: number) => void;
-  onUpgrade: () => void;
-  onUninstall: () => void;
+// Import shared utilities
+import { formatAge, itemVariants } from '../../utils/constants';
+import { StatusBadge } from '../common/StatusBadge';
+
+// Helm-specific status label mapping
+const helmStatusLabels: Record<string, string> = {
+  deployed: 'Deployed',
+  failed: 'Failed',
+  'pending-install': 'Installing',
+  'pending-upgrade': 'Upgrading',
+  'pending-rollback': 'Rolling back',
+  uninstalling: 'Uninstalling',
+  superseded: 'Superseded',
+  unknown: 'Unknown',
+};
+
+// Helper to map Helm status to standard status
+function getHelmStatusType(status: HelmReleaseStatus): string {
+  const statusMap: Record<string, string> = {
+    deployed: 'deployed',
+    failed: 'failed',
+    'pending-install': 'pending',
+    'pending-upgrade': 'progressing',
+    'pending-rollback': 'warning',
+    uninstalling: 'warning',
+    superseded: 'unknown',
+    unknown: 'unknown',
+  };
+  return statusMap[status] || 'unknown';
 }
 
-function ReleaseDetail({ release, onClose, onRollback, onUpgrade, onUninstall }: ReleaseDetailProps) {
-  const [history, setHistory] = useState<HelmReleaseHistory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'history' | 'values'>('history');
-  const [values, setValues] = useState<Record<string, unknown>>({});
+// Helm Status Badge using shared StatusBadge
+function HelmStatusBadge({ status }: { status: HelmReleaseStatus }) {
+  return (
+    <StatusBadge
+      status={getHelmStatusType(status)}
+      label={helmStatusLabels[status] || status}
+      size="sm"
+      animate={status.startsWith('pending') || status === 'uninstalling'}
+    />
+  );
+}
 
-  useEffect(() => {
-    loadHistory();
-  }, [release]);
-
-  const loadHistory = async () => {
-    try {
-      setLoading(true);
-      const [historyRes, valuesRes] = await Promise.all([
-        helmApi.getReleaseHistory(release.namespace, release.name),
-        helmApi.getReleaseValues(release.namespace, release.name, false),
-      ]);
-      setHistory(historyRes.data);
-      setValues(valuesRes.data.user_supplied || {});
-    } catch (error) {
-      console.error('Failed to load release details:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+// Dropdown Component
+function Dropdown({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-        <div className="relative w-full max-w-4xl rounded-lg bg-white dark:bg-slate-800 shadow-xl">
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 p-4">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {release.name}
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {release.chart} ({release.chart_version}) in {release.namespace}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+    <div className="relative">
+      <label className="text-sm text-gray-500 dark:text-gray-400 mb-1.5 block">{label}</label>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between gap-3 px-4 py-2.5 min-w-[180px] text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg hover:border-primary-500 transition-colors"
+      >
+        <span className="text-gray-900 dark:text-white">{value}</span>
+        <ChevronDownIcon className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden"
+          >
+            {options.map((option) => (
               <button
-                onClick={onUpgrade}
-                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Upgrade
-              </button>
-              <button
-                onClick={onUninstall}
-                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Uninstall
-              </button>
-              <button
-                onClick={onClose}
-                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <XCircleIcon className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="border-b border-gray-200 dark:border-slate-700">
-            <nav className="flex -mb-px">
-              <button
-                onClick={() => setActiveTab('history')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 ${
-                  activeTab === 'history'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                key={option}
+                onClick={() => {
+                  onChange(option);
+                  setIsOpen(false);
+                }}
+                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors ${
+                  option === value ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
-                Revision History
+                {option}
               </button>
-              <button
-                onClick={() => setActiveTab('values')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 ${
-                  activeTab === 'values'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                }`}
-              >
-                Values
-              </button>
-            </nav>
-          </div>
-
-          <div className="p-4 max-h-96 overflow-y-auto">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <ArrowPathIcon className="h-8 w-8 animate-spin text-gray-400" />
-              </div>
-            ) : activeTab === 'history' ? (
-              <div className="space-y-2">
-                {history.map((h) => (
-                  <div
-                    key={h.revision}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-mono font-medium text-gray-700 dark:text-gray-300">
-                        Rev {h.revision}
-                      </span>
-                      <StatusBadge status={h.status} />
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {h.chart} ({h.chart_version})
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(h.updated).toLocaleString()}
-                      </span>
-                      {h.revision !== release.revision && (
-                        <button
-                          onClick={() => onRollback(h.revision)}
-                          className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                        >
-                          Rollback
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg text-sm overflow-x-auto">
-                {Object.keys(values).length > 0
-                  ? JSON.stringify(values, null, 2)
-                  : '# No user-supplied values'}
-              </pre>
-            )}
-          </div>
-        </div>
-      </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: HelmReleaseStatus }) {
-  const config: Record<HelmReleaseStatus, { bg: string; text: string; icon: React.ElementType }> = {
-    deployed: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', icon: CheckCircleIcon },
-    failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', icon: XCircleIcon },
-    'pending-install': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', icon: ClockIcon },
-    'pending-upgrade': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', icon: ClockIcon },
-    'pending-rollback': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', icon: ClockIcon },
-    uninstalling: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', icon: TrashIcon },
-    superseded: { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-700 dark:text-gray-400', icon: ArrowUturnLeftIcon },
-    unknown: { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-700 dark:text-gray-400', icon: ExclamationTriangleIcon },
-  };
-
-  const { bg, text, icon: Icon } = config[status] || config.unknown;
-
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${bg} ${text}`}>
-      <Icon className="h-3.5 w-3.5" />
-      {status}
-    </span>
-  );
-}
-
+// Main Component
 export default function HelmDashboard() {
-  const [releases, setReleases] = useState<HelmRelease[]>([]);
-  const [repositories, setRepositories] = useState<HelmRepository[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedRelease, setSelectedRelease] = useState<HelmRelease | null>(null);
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [selectedNamespace, setSelectedNamespace] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [chartSearchQuery, setChartSearchQuery] = useState('');
-  const [chartSearchResults, setChartSearchResults] = useState<HelmChartSearchResult[]>([]);
-  const [searchingCharts, setSearchingCharts] = useState(false);
-  const [showInstallModal, setShowInstallModal] = useState(false);
-  const [expandedNamespaces, setExpandedNamespaces] = useState<Set<string>>(new Set());
-  const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Use cached hook for releases
+  const { releases, isLoading: initialLoading, isRefetching: loading, error, refresh } = useHelmReleases(selectedNamespace);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [releasesRes, reposRes] = await Promise.all([
-        helmApi.listReleases(),
-        helmApi.listRepositories(),
-      ]);
-      setReleases(releasesRes.data.releases || []);
-      setRepositories(reposRes.data.repositories || []);
+  // Extract unique namespaces from releases
+  const namespaces = useMemo(() => {
+    const uniqueNamespaces = new Set(['all', 'default']);
+    releases.forEach(r => uniqueNamespaces.add(r.namespace));
+    return Array.from(uniqueNamespaces);
+  }, [releases]);
 
-      // Auto-expand namespaces with releases
-      const namespaces = new Set(releasesRes.data.releases?.map(r => r.namespace) || []);
-      setExpandedNamespaces(namespaces);
-    } catch (error) {
-      console.error('Failed to load Helm data:', error);
-      setOperationMessage({ type: 'error', message: 'Failed to load Helm data' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearchCharts = async () => {
-    if (!chartSearchQuery.trim()) return;
-
-    try {
-      setSearchingCharts(true);
-      const response = await helmApi.searchCharts(chartSearchQuery);
-      setChartSearchResults(response.data || []);
-    } catch (error) {
-      console.error('Chart search failed:', error);
-      setOperationMessage({ type: 'error', message: 'Chart search failed' });
-    } finally {
-      setSearchingCharts(false);
-    }
-  };
-
-  const handleRollback = async (release: HelmRelease, revision: number) => {
-    try {
-      const result = await helmApi.rollbackRelease(release.namespace, release.name, revision);
-      if (result.data.success) {
-        setOperationMessage({ type: 'success', message: `Rolled back ${release.name} to revision ${revision}` });
-        loadData();
-        setSelectedRelease(null);
-      } else {
-        setOperationMessage({ type: 'error', message: result.data.message });
-      }
-    } catch (error) {
-      setOperationMessage({ type: 'error', message: 'Rollback failed' });
-    }
-  };
-
-  const handleUninstall = async (release: HelmRelease) => {
-    if (!confirm(`Are you sure you want to uninstall ${release.name}?`)) return;
-
-    try {
-      const result = await helmApi.uninstallRelease(release.namespace, release.name);
-      if (result.data.success) {
-        setOperationMessage({ type: 'success', message: `Uninstalled ${release.name}` });
-        loadData();
-        setSelectedRelease(null);
-      } else {
-        setOperationMessage({ type: 'error', message: result.data.message });
-      }
-    } catch (error) {
-      setOperationMessage({ type: 'error', message: 'Uninstall failed' });
-    }
-  };
-
-  const toggleNamespace = (namespace: string) => {
-    setExpandedNamespaces(prev => {
-      const next = new Set(prev);
-      if (next.has(namespace)) {
-        next.delete(namespace);
-      } else {
-        next.add(namespace);
-      }
-      return next;
-    });
-  };
-
-  // Group releases by namespace
-  const releasesByNamespace = releases.reduce((acc, release) => {
-    if (!acc[release.namespace]) {
-      acc[release.namespace] = [];
-    }
-    acc[release.namespace].push(release);
-    return acc;
-  }, {} as Record<string, HelmRelease[]>);
-
-  // Filter releases by search query
-  const filteredNamespaces = Object.entries(releasesByNamespace).filter(([namespace, releases]) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      namespace.toLowerCase().includes(query) ||
-      releases.some(r => r.name.toLowerCase().includes(query) || r.chart.toLowerCase().includes(query))
-    );
+  // Filter releases based on search and namespace
+  const filteredReleases = releases.filter((release) => {
+    const matchesSearch =
+      release.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      release.chart.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesNamespace = selectedNamespace === 'all' || release.namespace === selectedNamespace;
+    return matchesSearch && matchesNamespace;
   });
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Helm Releases
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Manage Helm chart deployments across your clusters
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={loadData}
-            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
-          >
-            <ArrowPathIcon className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            onClick={() => setShowInstallModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Install Chart
-          </button>
-        </div>
-      </div>
+  const handleRefresh = async () => {
+    await refresh();
+    toast.success('Refreshed', 'Helm releases updated');
+  };
 
-      {/* Operation Message */}
-      {operationMessage && (
-        <div
-          className={`p-4 rounded-lg ${
-            operationMessage.type === 'success'
-              ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-              : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span>{operationMessage.message}</span>
-            <button onClick={() => setOperationMessage(null)}>
-              <XCircleIcon className="h-5 w-5" />
-            </button>
+  const handleUpgrade = async (release: HelmRelease) => {
+    try {
+      const response = await helmApi.upgradeRelease(release.namespace, release.name, {
+        chart: release.chart,
+        reuse_values: true,
+      });
+      if (response.data.success) {
+        toast.success('Upgrade Started', `Upgrading ${release.name}`);
+        refresh();
+      } else {
+        toast.error('Upgrade Failed', response.data.message || `Failed to upgrade ${release.name}`);
+      }
+    } catch (err: any) {
+      logger.error('Failed to upgrade release', err);
+      const errorMessage = err.response?.data?.detail || err.message || `Failed to upgrade ${release.name}`;
+      toast.error('Upgrade Failed', errorMessage);
+    }
+  };
+
+  const handleDelete = async (release: HelmRelease) => {
+    if (!confirm(`Are you sure you want to delete release "${release.name}"?`)) return;
+    try {
+      const response = await helmApi.uninstallRelease(release.namespace, release.name);
+      if (response.data.success) {
+        toast.success('Deleted', `Release ${release.name} deleted`);
+        refresh();
+      } else {
+        toast.error('Delete Failed', response.data.message || `Failed to delete ${release.name}`);
+      }
+    } catch (err: any) {
+      logger.error('Failed to delete release', err);
+      const errorMessage = err.response?.data?.detail || err.message || `Failed to delete ${release.name}`;
+      toast.error('Delete Failed', errorMessage);
+    }
+  };
+
+
+  // Calculate stats
+  const stats = {
+    total: filteredReleases.length,
+    deployed: filteredReleases.filter(r => r.status === 'deployed').length,
+    failed: filteredReleases.filter(r => r.status === 'failed').length,
+    pending: filteredReleases.filter(r => r.status.startsWith('pending')).length,
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-6.5rem)] overflow-hidden bg-gray-50 dark:bg-slate-900">
+      {/* Header Section */}
+      <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
+            <CubeIcon className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Helm Releases</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Manage and monitor your deployments
+            </p>
           </div>
         </div>
-      )}
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/deploy/helm/catalog')}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg hover:shadow-lg transition-all"
+        >
+          <PlusIcon className="h-5 w-5" />
+          Install Chart
+        </motion.button>
+      </div>
 
-      {/* Search & Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-2">
-          <div className="relative">
+      {/* Stats Cards */}
+      <div className="px-6 py-4 grid grid-cols-4 gap-4 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200 dark:border-blue-800"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">Total</p>
+              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">{stats.total}</p>
+            </div>
+            <CubeIcon className="h-8 w-8 text-blue-500 opacity-50" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase">Deployed</p>
+              <p className="text-2xl font-bold text-green-900 dark:text-green-100 mt-1">{stats.deployed}</p>
+            </div>
+            <CheckCircleIcon className="h-8 w-8 text-green-500 opacity-50" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="p-4 rounded-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">Failed</p>
+              <p className="text-2xl font-bold text-red-900 dark:text-red-100 mt-1">{stats.failed}</p>
+            </div>
+            <XCircleIcon className="h-8 w-8 text-red-500 opacity-50" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border border-amber-200 dark:border-amber-800"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">Pending</p>
+              <p className="text-2xl font-bold text-amber-900 dark:text-amber-100 mt-1">{stats.pending}</p>
+            </div>
+            <ClockIcon className="h-8 w-8 text-amber-500 opacity-50" />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="px-6 py-3 bg-gray-50 dark:bg-slate-900/50 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search releases..."
+              placeholder="Search releases by name or chart..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             />
           </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total Releases</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{releases.length}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Repositories</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{repositories.length}</p>
+          <Dropdown
+            label=""
+            value={selectedNamespace}
+            options={namespaces}
+            onChange={setSelectedNamespace}
+          />
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleRefresh}
+            disabled={loading}
+            className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+          >
+            <ArrowPathIcon className={`h-5 w-5 text-gray-600 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
+          </motion.button>
         </div>
       </div>
 
-      {/* Releases List */}
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <ArrowPathIcon className="h-8 w-8 animate-spin text-gray-400" />
-        </div>
-      ) : releases.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
-          <CubeIcon className="h-12 w-12 mx-auto text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No Helm Releases</h3>
-          <p className="mt-2 text-gray-500 dark:text-gray-400">
-            Install a Helm chart to get started.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredNamespaces.map(([namespace, nsReleases]) => (
-            <div
-              key={namespace}
-              className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden"
-            >
-              <button
-                onClick={() => toggleNamespace(namespace)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700"
-              >
-                <div className="flex items-center gap-3">
-                  {expandedNamespaces.has(namespace) ? (
-                    <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-                  )}
-                  <span className="font-medium text-gray-900 dark:text-white">{namespace}</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    ({nsReleases.length} releases)
-                  </span>
-                </div>
-              </button>
-
-              {expandedNamespaces.has(namespace) && (
-                <div className="border-t border-gray-200 dark:border-slate-700">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-slate-700">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Release
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Chart
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Status
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Revision
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Updated
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-                      {nsReleases
-                        .filter(r => !searchQuery || r.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .map((release) => (
-                          <tr
-                            key={`${release.namespace}-${release.name}`}
-                            className="hover:bg-gray-50 dark:hover:bg-slate-700"
-                          >
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => setSelectedRelease(release)}
-                                className="font-medium text-primary-600 dark:text-primary-400 hover:underline"
-                              >
-                                {release.name}
-                              </button>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                              {release.chart}
-                              <span className="text-gray-500 dark:text-gray-400 ml-1">
-                                ({release.chart_version})
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <StatusBadge status={release.status} />
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                              {release.revision}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                              {release.updated
-                                ? new Date(release.updated).toLocaleString()
-                                : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => setSelectedRelease(release)}
-                                  className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-600 rounded"
-                                  title="View Details"
-                                >
-                                  <CubeIcon className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleUninstall(release)}
-                                  className="p-1.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
-                                  title="Uninstall"
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Error Banner */}
+      {error && (
+        <div className="mx-6 mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex-shrink-0">
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 
-      {/* Release Detail Modal */}
-      {selectedRelease && (
-        <ReleaseDetail
-          release={selectedRelease}
-          onClose={() => setSelectedRelease(null)}
-          onRollback={(revision) => handleRollback(selectedRelease, revision)}
-          onUpgrade={() => {
-            // TODO: Implement upgrade modal
-            setOperationMessage({ type: 'error', message: 'Upgrade modal not yet implemented' });
-          }}
-          onUninstall={() => handleUninstall(selectedRelease)}
-        />
-      )}
-
-      {/* Install Chart Modal */}
-      {showInstallModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowInstallModal(false)} />
-            <div className="relative w-full max-w-2xl rounded-lg bg-white dark:bg-slate-800 shadow-xl">
-              <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 p-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Install Helm Chart
-                </h2>
-                <button
-                  onClick={() => setShowInstallModal(false)}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                >
-                  <XCircleIcon className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="p-4 space-y-4">
-                {/* Chart Search */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Search Charts
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g., nginx, redis, postgresql"
-                      value={chartSearchQuery}
-                      onChange={(e) => setChartSearchQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSearchCharts()}
-                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                    />
-                    <button
-                      onClick={handleSearchCharts}
-                      disabled={searchingCharts}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-                    >
-                      {searchingCharts ? (
-                        <ArrowPathIcon className="h-5 w-5 animate-spin" />
-                      ) : (
-                        'Search'
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Search Results */}
-                {chartSearchResults.length > 0 && (
-                  <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-slate-700 rounded-lg">
-                    {chartSearchResults.map((chart, index) => (
-                      <div
-                        key={`${chart.repository}-${chart.name}-${index}`}
-                        className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-slate-700 border-b border-gray-200 dark:border-slate-700 last:border-b-0"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {chart.repository}/{chart.name}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {chart.description?.slice(0, 100)}
-                            {chart.description && chart.description.length > 100 ? '...' : ''}
-                          </p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">
-                            v{chart.version}
-                            {chart.app_version && ` (App: ${chart.app_version})`}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            // TODO: Open install form with this chart
-                            setOperationMessage({
-                              type: 'error',
-                              message: 'Install form not yet implemented'
-                            });
-                          }}
-                          className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
-                        >
-                          Install
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {chartSearchResults.length === 0 && chartSearchQuery && !searchingCharts && (
-                  <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-                    No charts found. Try updating your repositories.
-                  </p>
-                )}
-              </div>
-
-              <div className="border-t border-gray-200 dark:border-slate-700 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-b-lg">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Available repositories: {repositories.map(r => r.name).join(', ') || 'None configured'}
-                </p>
-              </div>
+      {/* Main Content - Card Grid */}
+      <div className="flex-1 overflow-auto p-6">
+        {loading && filteredReleases.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <ArrowPathIcon className="h-12 w-12 text-gray-400 animate-spin mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">Loading releases...</p>
             </div>
           </div>
-        </div>
-      )}
+        ) : filteredReleases.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <CubeIcon className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">No releases found</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {searchQuery ? 'Try adjusting your search' : 'Get started by installing a chart'}
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/deploy/helm/catalog')}
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg hover:shadow-lg transition-all"
+              >
+                Install Your First Chart
+              </motion.button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredReleases.map((release, index) => (
+              <motion.div
+                key={`${release.namespace}/${release.name}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ y: -4 }}
+                className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4 shadow-sm hover:shadow-md transition-all"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{release.name}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{release.chart}</p>
+                  </div>
+                  <HelmStatusBadge status={release.status} />
+                </div>
+
+                {/* Card Info */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 dark:text-gray-400">Namespace</span>
+                    <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 font-medium">
+                      {release.namespace}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 dark:text-gray-400">Version</span>
+                    <span className="text-gray-900 dark:text-white font-medium">{release.chart_version}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 dark:text-gray-400">Updated</span>
+                    <span className="text-gray-900 dark:text-white font-medium">{formatAge(release.updated)}</span>
+                  </div>
+                </div>
+
+                {/* Card Actions */}
+                <div className="flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-slate-700">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate(`/deploy/helm/workspace/${release.namespace}/${release.name}`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                  >
+                    <EyeIcon className="h-3.5 w-3.5" />
+                    View
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleUpgrade(release)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 rounded hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                  >
+                    <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+                    Upgrade
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleDelete(release)}
+                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded transition-colors"
+                    title="Delete"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </motion.button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

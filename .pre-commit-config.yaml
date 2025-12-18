@@ -1,4 +1,4 @@
-# Pre-commit hooks for NexOps
+# Pre-commit hooks for NextSight
 # Install: pip install pre-commit && pre-commit install
 # Run manually: pre-commit run --all-files
 

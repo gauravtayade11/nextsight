@@ -124,9 +124,9 @@ async def prometheus_webhook(payload: AlertmanagerWebhook):
     Webhook endpoint for Prometheus Alertmanager
     Configure in Alertmanager:
     receivers:
-      - name: 'nexops'
+      - name: 'nextsight'
         webhook_configs:
-          - url: 'http://nexops:8000/api/v1/alerts/webhook/prometheus'
+          - url: 'http://nextsight:8000/api/v1/alerts/webhook/prometheus'
     """
     incidents_store = get_incidents_store()
     created = []

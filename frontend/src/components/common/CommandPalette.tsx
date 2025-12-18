@@ -5,20 +5,19 @@ import {
   MagnifyingGlassIcon,
   HomeIcon,
   ServerStackIcon,
-  ExclamationTriangleIcon,
-  ClockIcon,
-  WrenchScrewdriverIcon,
-  RocketLaunchIcon,
-  CubeIcon,
   ShieldCheckIcon,
-  CurrencyDollarIcon,
   CloudIcon,
   CommandLineIcon,
   SparklesIcon,
   ArrowRightIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
+  UserGroupIcon,
+  ChartBarIcon,
+  DocumentArrowUpIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CommandItem {
   id: string;
@@ -41,30 +40,32 @@ export default function CommandPalette({ isOpen, onClose, onOpenAIChat }: Comman
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const commands: CommandItem[] = useMemo(() => [
     // Navigation
-    { id: 'nav-dashboard', title: 'Go to Dashboard', icon: HomeIcon, action: () => { navigate('/'); onClose(); }, category: 'navigation' },
-    { id: 'nav-kubernetes', title: 'Go to Kubernetes', icon: ServerStackIcon, action: () => { navigate('/kubernetes'); onClose(); }, category: 'navigation' },
-    { id: 'nav-clusters', title: 'Go to Clusters', icon: CloudIcon, action: () => { navigate('/clusters'); onClose(); }, category: 'navigation' },
-    { id: 'nav-helm', title: 'Go to Helm', icon: CubeIcon, action: () => { navigate('/helm'); onClose(); }, category: 'navigation' },
-    { id: 'nav-cost', title: 'Go to Cost Analysis', icon: CurrencyDollarIcon, action: () => { navigate('/cost'); onClose(); }, category: 'navigation' },
-    { id: 'nav-security', title: 'Go to Security', icon: ShieldCheckIcon, action: () => { navigate('/security'); onClose(); }, category: 'navigation' },
-    { id: 'nav-incidents', title: 'Go to Incidents', icon: ExclamationTriangleIcon, action: () => { navigate('/incidents'); onClose(); }, category: 'navigation' },
-    { id: 'nav-timeline', title: 'Go to Timeline', icon: ClockIcon, action: () => { navigate('/timeline'); onClose(); }, category: 'navigation' },
-    { id: 'nav-selfservice', title: 'Go to Self-Service', icon: WrenchScrewdriverIcon, action: () => { navigate('/selfservice'); onClose(); }, category: 'navigation' },
-    { id: 'nav-releases', title: 'Go to Releases', icon: RocketLaunchIcon, action: () => { navigate('/releases'); onClose(); }, category: 'navigation' },
-    { id: 'nav-terminal', title: 'Open Terminal', icon: CommandLineIcon, action: () => { navigate('/kubernetes/terminal'); onClose(); }, category: 'navigation', shortcut: 'T' },
+    { id: 'nav-dashboard', title: 'Go to Dashboard', icon: HomeIcon, action: () => { navigate('/'); onClose(); }, category: 'navigation', shortcut: '⇧D' },
+    { id: 'nav-kubernetes', title: 'Go to Kubernetes', icon: ServerStackIcon, action: () => { navigate('/kubernetes'); onClose(); }, category: 'navigation', shortcut: '⇧K' },
+    { id: 'nav-clusters', title: 'Go to Clusters', icon: CloudIcon, action: () => { navigate('/clusters'); onClose(); }, category: 'navigation', shortcut: '⇧C' },
+    { id: 'nav-deploy', title: 'Go to Deploy', icon: DocumentArrowUpIcon, action: () => { navigate('/deploy'); onClose(); }, category: 'navigation' },
+    { id: 'nav-security', title: 'Go to Security', icon: ShieldCheckIcon, action: () => { navigate('/security'); onClose(); }, category: 'navigation', shortcut: '⇧S' },
+    { id: 'nav-metrics', title: 'Go to Metrics', icon: ChartBarIcon, action: () => { navigate('/kubernetes/metrics'); onClose(); }, category: 'navigation' },
+    { id: 'nav-terminal', title: 'Open Terminal', icon: CommandLineIcon, action: () => { navigate('/kubernetes/terminal'); onClose(); }, category: 'navigation', shortcut: '⇧T' },
+    { id: 'nav-profile', title: 'Go to Profile', icon: UserCircleIcon, action: () => { navigate('/profile'); onClose(); }, category: 'navigation' },
+    ...(isAdmin ? [
+      { id: 'nav-users', title: 'Go to User Management', icon: UserGroupIcon, action: () => { navigate('/admin/users'); onClose(); }, category: 'navigation' as const, shortcut: '⇧U' },
+    ] : []),
     // Actions
-    { id: 'action-deploy', title: 'Deploy Application', description: 'Start a new deployment', icon: RocketLaunchIcon, action: () => { navigate('/kubernetes/deploy'); onClose(); }, category: 'actions' },
+    { id: 'action-deploy', title: 'Deploy YAML', description: 'Deploy resources from YAML', icon: DocumentArrowUpIcon, action: () => { navigate('/deploy'); onClose(); }, category: 'actions' },
     { id: 'action-scan', title: 'Run Security Scan', description: 'Scan cluster for vulnerabilities', icon: ShieldCheckIcon, action: () => { navigate('/security'); onClose(); }, category: 'actions' },
-    { id: 'action-settings', title: 'Open Settings', description: 'Configure preferences', icon: Cog6ToothIcon, action: () => { onClose(); }, category: 'actions' },
-    { id: 'action-logout', title: 'Sign Out', description: 'Log out of NexOps', icon: ArrowRightOnRectangleIcon, action: () => { onClose(); }, category: 'actions' },
+    { id: 'action-settings', title: 'Open Settings', description: 'Configure preferences', icon: Cog6ToothIcon, action: () => { navigate('/profile'); onClose(); }, category: 'actions' },
+    { id: 'action-logout', title: 'Sign Out', description: 'Log out of NextSight AI', icon: ArrowRightOnRectangleIcon, action: () => { logout(); onClose(); }, category: 'actions' },
     // AI
-    { id: 'ai-chat', title: 'Ask AI Assistant', description: 'Get help from NexOps AI', icon: SparklesIcon, action: () => { onClose(); onOpenAIChat?.(); }, category: 'ai', shortcut: 'A' },
+    { id: 'ai-chat', title: 'Ask AI Assistant', description: 'Get help from NextSight AI', icon: SparklesIcon, action: () => { onClose(); onOpenAIChat?.(); }, category: 'ai', shortcut: '⇧A' },
     { id: 'ai-analyze', title: 'AI: Analyze Cluster', description: 'Get AI insights on your cluster', icon: SparklesIcon, action: () => { onClose(); onOpenAIChat?.(); }, category: 'ai' },
     { id: 'ai-optimize', title: 'AI: Suggest Optimizations', description: 'Get cost and performance tips', icon: SparklesIcon, action: () => { onClose(); onOpenAIChat?.(); }, category: 'ai' },
-  ], [navigate, onClose, onOpenAIChat]);
+  ], [navigate, onClose, onOpenAIChat, isAdmin, logout]);
 
   const filteredCommands = useMemo(() => {
     if (!search.trim()) return commands;
@@ -264,7 +265,7 @@ export default function CommandPalette({ isOpen, onClose, onOpenAIChat }: Comman
                 </div>
                 <span className="flex items-center gap-1">
                   <SparklesIcon className="h-3.5 w-3.5" />
-                  NexOps Command Palette
+                  NextSight AI Command Palette
                 </span>
               </div>
             </div>
@@ -275,15 +276,49 @@ export default function CommandPalette({ isOpen, onClose, onOpenAIChat }: Comman
   );
 }
 
-// Hook for command palette keyboard shortcut
+// Hook for command palette keyboard shortcut with global navigation
 export function useCommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Command palette toggle: ⌘K or Ctrl+K
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setIsOpen((prev) => !prev);
+        return;
+      }
+
+      // Global shortcuts only work when not in an input field
+      const target = e.target as HTMLElement;
+      const isInputField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+      if (isInputField) return;
+
+      // ⌘+Shift or Ctrl+Shift shortcuts for navigation
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+        const shortcuts: Record<string, string> = {
+          'd': '/',           // Dashboard
+          'k': '/kubernetes', // Kubernetes
+          'c': '/clusters',   // Clusters
+          's': '/security',   // Security
+          't': '/kubernetes/terminal', // Terminal
+          'a': 'ai-chat',     // AI Chat (special handling)
+          'u': '/admin/users', // Users (admin only)
+        };
+
+        const key = e.key.toLowerCase();
+        const path = shortcuts[key];
+
+        if (path) {
+          e.preventDefault();
+          if (path === 'ai-chat') {
+            // Dispatch custom event for AI chat - will be handled by App component
+            window.dispatchEvent(new CustomEvent('open-ai-chat'));
+          } else {
+            // Use history API for navigation
+            window.dispatchEvent(new CustomEvent('navigate', { detail: { path } }));
+          }
+        }
       }
     };
 

@@ -1,9 +1,12 @@
 """Security scanning and compliance API endpoints."""
 
+import logging
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+logger = logging.getLogger(__name__)
 
 from app.core.security import get_current_user
 from app.schemas.auth import UserInfo
@@ -362,7 +365,7 @@ Format your response in markdown with clear sections."""
     except ImportError:
         pass  # Fall back to rule-based
     except Exception as e:
-        print(f"AI remediation failed, using fallback: {e}")
+        logger.warning(f"AI remediation failed, using fallback: {e}")
 
     # Fallback to rule-based remediation
     return _get_rule_based_remediation(request)

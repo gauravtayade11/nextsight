@@ -1,5 +1,7 @@
+import base64
 import logging
 import os
+import tempfile
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -8,7 +10,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.config import list_kube_config_contexts
 
 from app.core.config import settings
-from app.schemas.cluster import ClusterConfig, ClusterContextInfo, ClusterHealth, ClusterInfo, ClusterStatus
+from app.schemas.cluster import AuthType, ClusterConfig, ClusterContextInfo, ClusterHealth, ClusterInfo, ClusterStatus
 
 logger = logging.getLogger(__name__)
 
@@ -88,26 +90,63 @@ class ClusterService:
             raise ValueError(f"Cluster not found: {cluster_id}")
 
         try:
-            if cluster.in_cluster:
+            api_client = None
+
+            # Handle token-based authentication
+            if cluster.auth_type == AuthType.TOKEN and cluster.api_server and cluster.bearer_token:
+                configuration = client.Configuration()
+                configuration.host = cluster.api_server
+                configuration.api_key = {"authorization": f"Bearer {cluster.bearer_token}"}
+
+                # Handle CA certificate
+                if cluster.ca_cert:
+                    # Decode base64 CA cert and write to temp file
+                    ca_data = base64.b64decode(cluster.ca_cert)
+                    ca_file = tempfile.NamedTemporaryFile(delete=False, suffix=".crt")
+                    ca_file.write(ca_data)
+                    ca_file.close()
+                    configuration.ssl_ca_cert = ca_file.name
+                    configuration.verify_ssl = True
+                elif cluster.skip_tls_verify:
+                    configuration.verify_ssl = False
+                else:
+                    configuration.verify_ssl = True
+
+                api_client = client.ApiClient(configuration)
+
+            elif cluster.in_cluster or cluster.auth_type == AuthType.IN_CLUSTER:
                 config.load_incluster_config()
+                api_client = client.ApiClient()
+
+            elif cluster.kubeconfig_content:
+                # Write kubeconfig content to a temp file and load it
+                kubeconfig_file = tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w")
+                kubeconfig_file.write(cluster.kubeconfig_content)
+                kubeconfig_file.close()
+                config.load_kube_config(config_file=kubeconfig_file.name, context=cluster.context)
+                api_client = client.ApiClient()
+
             elif cluster.context:
                 config_path = cluster.kubeconfig_path
                 if config_path:
                     config_path = os.path.expanduser(config_path)
                 config.load_kube_config(config_file=config_path, context=cluster.context)
+
+                # Handle host override for Docker Desktop
+                if cluster.host_override:
+                    configuration = client.Configuration.get_default_copy()
+                    if configuration.host:
+                        configuration.host = configuration.host.replace("127.0.0.1", cluster.host_override).replace(
+                            "localhost", cluster.host_override
+                        )
+                        client.Configuration.set_default(configuration)
+
+                api_client = client.ApiClient()
+
             else:
                 config.load_kube_config()
+                api_client = client.ApiClient()
 
-            # Handle host override for Docker Desktop
-            if cluster.host_override:
-                configuration = client.Configuration.get_default_copy()
-                if configuration.host:
-                    configuration.host = configuration.host.replace("127.0.0.1", cluster.host_override).replace(
-                        "localhost", cluster.host_override
-                    )
-                    client.Configuration.set_default(configuration)
-
-            api_client = client.ApiClient()
             self._clients[cluster_id] = {
                 "api_client": api_client,
                 "core_v1": client.CoreV1Api(api_client),
@@ -351,6 +390,89 @@ class ClusterService:
         if self._active_cluster_id == cluster_id:
             self._active_cluster_id = next(iter(self._clusters.keys()), None)
 
+        return True
+
+    async def test_connection(self, cluster_id: str) -> Dict[str, Any]:
+        """Test connection to a specific cluster."""
+        self._initialize()
+
+        cluster_config = self._clusters.get(cluster_id)
+        if not cluster_config:
+            return {
+                "success": False,
+                "cluster_id": cluster_id,
+                "error": "Cluster not found",
+                "latency_ms": 0,
+            }
+
+        start_time = datetime.now(timezone.utc)
+
+        try:
+            # Clear cached client to force new connection
+            if cluster_id in self._clients:
+                del self._clients[cluster_id]
+
+            clients = self._get_client(cluster_id)
+            version_api = clients["version"]
+
+            # Test by fetching version info
+            version_info = version_api.get_code()
+
+            end_time = datetime.now(timezone.utc)
+            latency = (end_time - start_time).total_seconds() * 1000
+
+            return {
+                "success": True,
+                "cluster_id": cluster_id,
+                "message": "Connection successful",
+                "version": version_info.git_version,
+                "platform": version_info.platform,
+                "latency_ms": round(latency, 2),
+            }
+
+        except ApiException as e:
+            end_time = datetime.now(timezone.utc)
+            latency = (end_time - start_time).total_seconds() * 1000
+            return {
+                "success": False,
+                "cluster_id": cluster_id,
+                "error": f"API Error: {e.reason}",
+                "status_code": e.status,
+                "latency_ms": round(latency, 2),
+            }
+        except Exception as e:
+            end_time = datetime.now(timezone.utc)
+            latency = (end_time - start_time).total_seconds() * 1000
+            return {
+                "success": False,
+                "cluster_id": cluster_id,
+                "error": str(e),
+                "latency_ms": round(latency, 2),
+            }
+
+    async def update_cluster(self, cluster_id: str, new_config: ClusterConfig) -> bool:
+        """Update a cluster configuration."""
+        self._initialize()
+
+        if cluster_id not in self._clusters:
+            return False
+
+        # Close existing client connections
+        if cluster_id in self._clients:
+            del self._clients[cluster_id]
+
+        # If ID is changing, handle the rename
+        if cluster_id != new_config.id:
+            del self._clusters[cluster_id]
+            if self._active_cluster_id == cluster_id:
+                self._active_cluster_id = new_config.id
+
+        self._clusters[new_config.id] = new_config
+
+        if new_config.is_default:
+            self._active_cluster_id = new_config.id
+
+        logger.info(f"Updated cluster: {new_config.id}")
         return True
 
 

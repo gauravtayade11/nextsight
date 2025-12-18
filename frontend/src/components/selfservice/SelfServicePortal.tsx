@@ -9,6 +9,7 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { selfServiceApi, kubernetesApi } from '../../services/api';
+import { logger } from '../../utils/logger';
 import type { ServiceCatalogItem, SelfServiceAction, ActionType, Deployment } from '../../types';
 
 export default function SelfServicePortal() {
@@ -38,7 +39,7 @@ export default function SelfServicePortal() {
       setDeployments(deploymentsRes.data);
       setActions(actionsRes.data);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
+      logger.error('Failed to fetch data', error);
     } finally {
       setLoading(false);
     }
@@ -57,7 +58,7 @@ export default function SelfServicePortal() {
       setActionModal(null);
       await fetchData();
     } catch (error) {
-      console.error('Action failed:', error);
+      logger.error('Action failed', error);
     }
   }
 

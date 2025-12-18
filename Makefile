@@ -1,4 +1,4 @@
-.PHONY: help dev build up down logs clean test lint
+.PHONY: help dev build up down logs clean test lint restart
 
 # Colors for terminal output
 CYAN := \033[36m
@@ -7,7 +7,7 @@ YELLOW := \033[33m
 RESET := \033[0m
 
 help: ## Show this help message
-	@echo "$(CYAN)NexOps - DevOps Operations Center$(RESET)"
+	@echo "$(CYAN)NextSight - DevOps Operations Center$(RESET)"
 	@echo ""
 	@echo "$(GREEN)Available commands:$(RESET)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-15s$(RESET) %s\n", $$1, $$2}'
@@ -15,7 +15,7 @@ help: ## Show this help message
 # Docker Compose Commands
 dev: ## Start development environment
 	docker-compose up -d
-	@echo "$(GREEN)NexOps is running at http://localhost:3000$(RESET)"
+	@echo "$(GREEN)NextSight is running at http://localhost:3000$(RESET)"
 
 build: ## Build Docker images
 	docker-compose build
@@ -51,8 +51,9 @@ build-frontend: ## Build frontend image only
 
 # Production Build
 build-prod: ## Build production images with version tag
-	docker build -t nexops-backend:1.0.0 ./backend
-	docker build -t nexops-frontend:1.0.0 ./frontend
+	@VERSION=$$(cat VERSION); \
+	docker build -t nexops-backend:$$VERSION ./backend; \
+	docker build -t nexops-frontend:$$VERSION ./frontend
 
 # Kubernetes Deployment
 k8s-deploy: ## Deploy to Kubernetes
@@ -80,7 +81,7 @@ prune: ## Remove unused Docker resources
 
 # Development Helpers
 backend-dev: ## Run backend locally (without Docker)
-	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	cd backend && source venv/bin/activate && export DEBUG=true && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 frontend-dev: ## Run frontend locally (without Docker)
 	cd frontend && npm run dev

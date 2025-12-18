@@ -137,9 +137,9 @@ class K8sDeploymentService:
 
             deployment.spec.template.metadata.annotations.update(
                 {
-                    "nexops.io/version": version,
-                    "nexops.io/deployed-at": datetime.now(timezone.utc).isoformat(),
-                    "nexops.io/previous-image": old_image,
+                    "nextsight.io/version": version,
+                    "nextsight.io/deployed-at": datetime.now(timezone.utc).isoformat(),
+                    "nextsight.io/previous-image": old_image,
                 }
             )
 
@@ -239,9 +239,9 @@ class K8sDeploymentService:
 
                     deployment.spec.template.metadata.annotations.update(
                         {
-                            "nexops.io/rollback-reason": reason,
-                            "nexops.io/rolled-back-at": datetime.now(timezone.utc).isoformat(),
-                            "nexops.io/rolled-back-by": rolled_back_by or "system",
+                            "nextsight.io/rollback-reason": reason,
+                            "nextsight.io/rolled-back-at": datetime.now(timezone.utc).isoformat(),
+                            "nextsight.io/rolled-back-by": rolled_back_by or "system",
                         }
                     )
 

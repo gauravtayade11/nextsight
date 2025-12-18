@@ -7,19 +7,33 @@ kubernetes==34.1.0
 python-jenkins==1.8.3
 anthropic==0.18.1
 google-generativeai==0.8.5
+groq==0.37.1
 python-dateutil==2.8.2
 redis==7.1.0
+authlib>=1.6.5  # CVE-2025-62706, CVE-2025-61920, CVE-2025-59420, PYSEC-2024-52
+itsdangerous==2.1.2
 sqlalchemy==2.0.44
 alembic==1.13.1
 asyncpg==0.31.0
-python-multipart==0.0.6
+psycopg2-binary==2.9.9  # Sync driver for Alembic migrations
+python-multipart>=0.0.18  # CVE-2024-53981, CVE-2024-24762
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 websockets==15.0.1
 
+# Security - Pinned versions to fix CVEs
+# urllib3 version controlled by kubernetes package (requires <2.4.0)
+# Note: urllib3 2.3.0 has CVE-2025-66418, CVE-2025-66471, CVE-2025-50181, CVE-2025-50182
+# Cannot upgrade to 2.6.x until kubernetes-client/python adds support (currently pinned to <2.4.0)
+# See: https://github.com/kubernetes-client/python/issues/2458
+certifi>=2024.12.21  # CVE-2024-56326
+jinja2>=3.1.6  # Multiple CVEs fixed
+cryptography>=44.0.1  # Security fixes
+ecdsa>=0.19.1  # CVE-2024-23342 (latest version, no fix available yet)
+
 # Testing
-pytest==8.0.0
-pytest-asyncio==0.23.3
+pytest==8.4.2
+pytest-asyncio==0.24.0
 pytest-cov==7.0.0
-httpx==0.26.0
+greenlet==3.3.0  # Required for SQLAlchemy async operations
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

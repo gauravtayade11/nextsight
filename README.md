@@ -1,16 +1,16 @@
 <div align="center">
 
-# NexOps
+# NextSight AI
 
-### DevOps Operations Center
+### See your DevOps world in one intelligent view
 
-[![CI](https://github.com/gauravtayade11/nexops/actions/workflows/ci.yml/badge.svg)](https://github.com/gauravtayade11/nexops/actions/workflows/ci.yml)
-[![Security](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml/badge.svg)](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml)
-[![CodeQL](https://github.com/gauravtayade11/nexops/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/gauravtayade11/nexops/security/code-scanning)
+[![CI](https://github.com/gauravtayade11/nextsight/actions/workflows/ci.yml/badge.svg)](https://github.com/gauravtayade11/nextsight/actions/workflows/ci.yml)
+[![Security](https://github.com/gauravtayade11/nextsight/actions/workflows/security.yml/badge.svg)](https://github.com/gauravtayade11/nextsight/actions/workflows/security.yml)
+[![CodeQL](https://github.com/gauravtayade11/nextsight/security/code-scanning/badge.svg)](https://github.com/gauravtayade11/nextsight/security/code-scanning)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)](https://github.com/gauravtayade11/nexops/releases)
-[![GitHub stars](https://img.shields.io/github/stars/gauravtayade11/nexops?style=social)](https://github.com/gauravtayade11/nexops/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/gauravtayade11/nexops?style=social)](https://github.com/gauravtayade11/nexops/network/members)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/gauravtayade11/nextsight/releases)
+[![GitHub stars](https://img.shields.io/github/stars/gauravtayade11/nextsight?style=social)](https://github.com/gauravtayade11/nextsight/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/gauravtayade11/nextsight?style=social)](https://github.com/gauravtayade11/nextsight/network/members)
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
@@ -19,9 +19,9 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5.svg)](https://kubernetes.io/)
 [![Helm](https://img.shields.io/badge/Helm-Chart-0F1689.svg)](https://helm.sh/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/gauravtayade11/nexops/pulls)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/gauravtayade11/nextsight/pulls)
 
-**A modern, comprehensive Kubernetes management dashboard for DevOps teams.**
+**AI-powered Kubernetes management platform with real-time monitoring, security scanning, and intelligent insights.**
 
 [Features](#features) • [Screenshots](#screenshots) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Helm](#helm-installation) • [Contributing](#contributing)
 
@@ -33,20 +33,103 @@
 
 <div align="center">
 
-### Dashboard Overview
-![NexOps Dashboard](docs/images/HomePage.png)
+### 1. Dashboard Overview
+**Real-time cluster health monitoring with AI-powered insights**
 
-### Kubernetes Resources
-![Kubernetes Resources](docs/images/Kuberntes.png)
+![Dashboard - Overview with cluster metrics, pod status, and AI recommendations](docs/images/dashboard-overview.png)
 
-### Security Posture Dashboard
-![Security Dashboard](docs/images/Security.png)
+*Cluster overview with live metrics, health indicators, and actionable AI-powered insights*
+
+---
+
+### 2. Kubernetes Workloads
+**Complete resource management with health indicators**
+
+![Kubernetes - Workload management with health status and quick actions](docs/images/kubernetes-workloads.png)
+
+*Workload management showing pods, deployments with health indicators and one-click operations*
+
+---
+
+### 3. Security Dashboard
+**Trivy-powered vulnerability scanning with plain English explanations**
+
+![Security - Vulnerability scanning and security posture analysis](docs/images/security-dashboard.png)
+
+*Security posture showing Top 3 risks, vulnerability scans, and AI-powered remediation suggestions*
+
+---
+
+### 4. AI Assistant
+**Natural language queries with Groq/Gemini/Claude**
+
+![AI Assistant - Chat interface with cluster insights](docs/images/ai-assistant.png)
+
+*AI assistant providing intelligent answers about cluster status with real-time data*
+
+---
+
+### 5. Interactive Terminal
+**Pod exec and debug containers with xterm.js**
+
+![Terminal - Interactive shell access to pods and containers](docs/images/terminal.png)
+
+*Interactive terminal for pod exec, debug containers, and kubectl command execution*
+
+---
+
+### 6. Real-time Pod Logs
+**WebSocket-based log streaming with search**
+
+![Logs - Real-time streaming logs with search and filter](docs/images/pod-logs.png)
+
+*Live log viewer with WebSocket streaming, search functionality, and download option*
+
+---
+
+### 7. YAML Deployment
+**Deploy manifests with validation and summary**
+
+![Deploy - YAML editor with dry-run and deployment summary](docs/images/yaml-deploy.png)
+
+*YAML deployment with syntax validation, dry-run mode, and deployment summary modal*
+
+---
+
+### 8. Helm Management
+**Visual Helm chart deployment and management**
+
+![Helm - Chart catalog and release management](docs/images/helm-dashboard.png)
+
+*Helm chart browser with installation wizard, release management, and rollback capabilities*
+
+---
+
+### 9. Multi-Cluster Management
+**Switch between clusters seamlessly**
+
+![Clusters - Multi-cluster switcher and management](docs/images/cluster-management.png)
+
+*Cluster switcher showing multiple Kubernetes clusters with real-time status*
+
+---
+
+### 10. Security Remediation
+**AI-powered security fixes with kubectl commands**
+
+![Security Remediation - AI-generated fix suggestions](docs/images/security-remediation.png)
+
+*AI-powered security remediation with step-by-step kubectl commands and YAML examples*
+
+---
+
+> 💡 **Note**: Screenshots show NextSight AI v1.4.0 with all features enabled. Some features require optional components (metrics-server, Prometheus) or AI API keys (Groq/Gemini/Claude).
 
 </div>
 
 ## Overview
 
-NexOps is a powerful DevOps Operations Center that provides real-time visibility and control over your Kubernetes clusters. Built with FastAPI and React, it offers an intuitive web interface for monitoring, managing, and troubleshooting your containerized applications.
+NextSight AI is an AI-powered Kubernetes management platform that provides real-time visibility, intelligent security insights, and complete control over your clusters. Built with FastAPI and React, it combines traditional monitoring with AI-powered analysis for smarter DevOps operations.
 
 ## Features
 
@@ -137,8 +220,8 @@ NexOps is a powerful DevOps Operations Center that provides real-time visibility
 
 ```bash
 # Clone the repository
-git clone https://github.com/gauravtayade11/nexops.git
-cd NexOps
+git clone https://github.com/gauravtayade11/nextsight.git
+cd nextsight
 
 # Start the application
 make dev
@@ -165,12 +248,71 @@ make down          # Stop containers
 
 ### Prerequisites
 
-| Requirement | Version |
-|-------------|---------|
-| Docker | 20.10+ |
-| Docker Compose | 2.0+ |
-| kubectl | 1.25+ |
-| Kubernetes Cluster | 1.24+ |
+#### Required Components
+
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| Docker | 20.10+ | For containerized deployment |
+| Docker Compose | 2.0+ | For local development |
+| kubectl | 1.25+ | Kubernetes CLI tool |
+| Kubernetes Cluster | 1.24+ | Any CNCF-compliant distribution |
+
+#### Optional Components (Recommended)
+
+| Component | Purpose | Installation |
+|-----------|---------|--------------|
+| **metrics-server** | Pod/Node CPU & memory metrics | [Install Guide](https://github.com/kubernetes-sigs/metrics-server#installation) |
+| **Prometheus** | Advanced monitoring & alerting | [Helm Chart](https://prometheus-community.github.io/helm-charts) |
+| **Redis** | Caching for better performance | Included in docker-compose.yml |
+| **PostgreSQL** | User & pipeline data persistence | Included in docker-compose.yml |
+
+#### Built-in Tools (No Installation Required)
+
+| Tool | Purpose | Version |
+|------|---------|---------|
+| **Trivy** | Container vulnerability scanning | v0.58.0 (built into Docker image) |
+| **kubectl** | Kubernetes operations | Latest (included in backend) |
+| **helm** | Helm chart management | Latest (included in backend) |
+
+#### Installing metrics-server (Recommended)
+
+metrics-server is required for pod and node resource metrics:
+
+```bash
+# For most clusters (Docker Desktop, EKS, GKE, AKS)
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# For Minikube
+minikube addons enable metrics-server
+
+# For Kind or other clusters with self-signed certificates
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl patch deployment metrics-server -n kube-system --type='json' \
+  -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+
+# Verify installation
+kubectl get deployment metrics-server -n kube-system
+kubectl top nodes
+```
+
+#### Installing Prometheus (Optional)
+
+For advanced monitoring and alerting:
+
+```bash
+# Add Prometheus Helm repo
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# Install Prometheus
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring --create-namespace
+
+# Port forward to access Prometheus UI (optional)
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+```
+
+NextSight AI will automatically detect and integrate with Prometheus if available.
 
 ### Configuration
 
@@ -178,7 +320,7 @@ Create a `.env` file in the backend directory:
 
 ```env
 # Application
-APP_NAME=NexOps Center
+APP_NAME=NextSight AI
 DEBUG=false
 
 # Kubernetes (for local development)
@@ -193,7 +335,7 @@ GEMINI_API_KEY=your-api-key
 ### Project Structure
 
 ```
-NexOps/
+nextsight/
 ├── backend/                 # FastAPI Backend
 │   ├── app/
 │   │   ├── api/routes/     # REST API endpoints
@@ -270,30 +412,30 @@ make k8s-deploy
 make k8s-status
 
 # Port forward for access
-kubectl port-forward -n nexops svc/nexops-frontend 3000:80
+kubectl port-forward -n nextsight svc/nextsight-frontend 3000:80
 ```
 
 ### Helm Installation
 
-Deploy NexOps to your Kubernetes cluster using Helm:
+Deploy NextSight AI to your Kubernetes cluster using Helm:
 
 ```bash
 # Add the repository (when published)
-# helm repo add nexops https://gauravtayade11.github.io/nexops/charts
+# helm repo add nextsight https://gauravtayade11.github.io/nextsight/charts
 
 # Install from local chart
-helm install nexops ./charts/nexops -n nexops --create-namespace
+helm install nextsight ./charts/nextsight -n nextsight --create-namespace
 
 # Install with custom values
-helm install nexops ./charts/nexops -n nexops --create-namespace \
+helm install nextsight ./charts/nextsight -n nextsight --create-namespace \
   --set ingress.enabled=true \
-  --set ingress.hosts[0].host=nexops.example.com
+  --set ingress.hosts[0].host=nextsight.example.com
 
 # Upgrade existing installation
-helm upgrade nexops ./charts/nexops -n nexops
+helm upgrade nextsight ./charts/nextsight -n nextsight
 
 # Uninstall
-helm uninstall nexops -n nexops
+helm uninstall nextsight -n nextsight
 ```
 
 **Configuration options:**
@@ -303,10 +445,10 @@ helm uninstall nexops -n nexops
 | `backend.replicaCount` | Backend replicas | `1` |
 | `frontend.replicaCount` | Frontend replicas | `1` |
 | `ingress.enabled` | Enable ingress | `false` |
-| `ingress.hosts[0].host` | Ingress hostname | `nexops.local` |
+| `ingress.hosts[0].host` | Ingress hostname | `nextsight.local` |
 | `backend.extraEnv` | Extra env vars (secrets) | `[]` |
 
-See [charts/nexops/values.yaml](charts/nexops/values.yaml) for all options.
+See [charts/nextsight/values.yaml](charts/nextsight/values.yaml) for all options.
 
 ## Security
 
@@ -338,8 +480,8 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ```bash
 # Development setup
-git clone https://github.com/gauravtayade11/nexops.git
-cd NexOps
+git clone https://github.com/gauravtayade11/nextsight.git
+cd nextsight
 make dev
 ```
 

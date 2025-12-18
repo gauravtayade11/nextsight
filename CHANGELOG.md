@@ -1,11 +1,109 @@
 # Changelog
 
-All notable changes to NexOps will be documented in this file.
+All notable changes to NextSight will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.4.0] - 2025-12-17
+
+### Added
+- **Trivy in Docker Image** - Built-in vulnerability scanning
+  - Trivy binary included in backend Docker image
+  - No external dependencies required for image scanning
+  - Version 0.58.0 installed
+- **Metrics Server Status Endpoint** - Check metrics-server availability
+  - New `/api/v1/kubernetes/metrics/status` endpoint
+  - Auto-detect if metrics-server is installed
+  - Graceful fallback for clusters without metrics-server
+- **AI-Powered Proactive Insights** - Identifies issues before they become incidents
+  - New `/api/v1/ai/insights/proactive` endpoint
+  - Automatic detection of failed/crashing pods, degraded deployments
+  - Security risk identification from security dashboard
+  - Resource optimization opportunities
+  - Cluster health scoring
+- **AI Runbook Generation** - Creates incident response runbooks
+  - New `/api/v1/ai/runbook/generate` endpoint
+  - Support for pod_crash, deployment_failed, node_not_ready, oom_killed, network_issue
+  - Step-by-step kubectl commands with expected outputs
+  - Verification and escalation paths
+- **Smart Suggestions** - Context-aware cluster recommendations
+  - New `/api/v1/ai/suggestions/smart` endpoint
+  - Real-time cluster state analysis
+  - Actionable kubectl commands
+
+### User Experience Enhancements
+- **Dashboard Actionable Insights Card** - AI-powered recommendations on main dashboard
+  - Automatic issue detection and remediation suggestions
+  - One-click actions for common problems
+  - Severity-based priority indicators
+- **Top 3 Security Risks View** - Priority security findings on dashboard
+  - Highlights most critical vulnerabilities
+  - Quick access to detailed remediation
+  - "View All" button for complete security dashboard
+- **Plain English Security Explanations** - Business-friendly risk messaging
+  - Translates technical CVEs into understandable language
+  - Business impact assessment for each finding
+  - Non-technical stakeholder communication
+- **Workload Health Indicators** - Visual health status for all Kubernetes resources
+  - Green/Yellow/Red health dots on workload tables
+  - Instant visual assessment of resource health
+  - Health status based on replica readiness, restarts, and conditions
+- **WorkloadDrawer AI Fixes Tab** - Root cause analysis for failing workloads
+  - AI-powered troubleshooting suggestions
+  - Step-by-step remediation steps
+  - Integration with proactive insights
+- **YAML Deploy Summary Modal** - Pre-deployment validation and overview
+  - Resource type and name extraction
+  - Namespace detection and override
+  - Dry-run validation results
+  - Deployment confirmation with detailed summary
+
+### Changed
+- **Project Rebrand to NextSight AI**
+  - New name: NextSight AI
+  - Tagline: "See your DevOps world in one intelligent view"
+  - Updated all UI components, configs, and documentation
+  - Helm chart description updated
+
+### Improved
+- **Enhanced Caching** - Production-ready Redis caching
+  - Optimization dashboard caching (60s TTL)
+  - Prometheus targets caching (30s TTL)
+  - Prometheus alerts caching (15s TTL)
+  - AI proactive insights caching (120s TTL)
+- **Production Readiness**
+  - Comprehensive environment configuration
+  - Production checklist in .env.example
+  - Proper error handling across all services
+  - Graceful degradation when services unavailable
+- **Multi-Provider AI Support** - Support for Groq, Gemini, and Claude
+  - Groq with Llama 3.3 (recommended, 14.4K req/day free tier)
+  - Google Gemini 2.0 Flash (fast multimodal)
+  - Anthropic Claude Sonnet 4 (highest quality)
+  - Provider-agnostic configuration
+
+### Documentation
+- **Comprehensive Prerequisites Guide** - Complete installation documentation
+  - Required, optional, and built-in components clearly categorized
+  - Step-by-step installation guides for metrics-server (3 platform variants)
+  - Prometheus installation with Helm chart instructions
+  - Kubernetes cluster setup options (local and cloud)
+- **Screenshot Placeholders** - Visual documentation structure
+  - 10 screenshot placeholders in README.md
+  - 9 screenshot placeholders in MkDocs documentation
+  - Detailed screenshot capture guidelines
+- **Enhanced MkDocs Documentation** - Complete feature documentation
+  - Updated all AI provider references (Groq, Gemini, Claude)
+  - OAuth/SSO configuration guides (Google, GitHub, GitLab)
+  - PostgreSQL and Redis setup instructions
+  - Production deployment checklist
+
+### Deferred to Future Release
+- **Pipelines Module** - Full CI/CD pipeline management with agent-based execution
+- **Cost Analyzer** - Resource cost tracking, namespace breakdown, and savings recommendations
 
 ## [1.3.0] - 2025-12-04
 
@@ -178,7 +276,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2024-12-01
 
 ### Added
-- Initial release of NexOps DevOps Operations Center
+- Initial release of NextSight DevOps Operations Center
 - **Kubernetes Dashboard**
   - Real-time cluster health monitoring
   - Pod, deployment, and node management
@@ -225,6 +323,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 1.4.0 | 2025-12-05 | NextSight AI Rebrand, Trivy in Docker, Metrics Server Status |
 | 1.3.0 | 2025-12-04 | Pod Exec Terminal, Debug Containers, Security Dashboard, Glass-morphism UI |
 | 1.2.0 | 2024-12-02 | Dark Mode, Terminal Persistence, Multi-Cluster, RBAC, Helm UI, Cost Dashboard |
 | 1.1.0 | 2024-12-01 | WebSocket Real-Time Log Streaming |

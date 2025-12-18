@@ -12,7 +12,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 function getInitialTheme(): Theme {
   // Check localStorage first
-  const stored = localStorage.getItem('nexops-theme');
+  const stored = localStorage.getItem('nextsight-theme');
   if (stored === 'dark' || stored === 'light') {
     return stored;
   }
@@ -34,7 +34,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Add the current theme class
     root.classList.add(theme);
     // Persist to localStorage
-    localStorage.setItem('nexops-theme', theme);
+    localStorage.setItem('nextsight-theme', theme);
   }, [theme]);
 
   const toggleTheme = useCallback(() => {

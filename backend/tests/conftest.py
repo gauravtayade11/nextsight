@@ -1,8 +1,21 @@
 """
-Pytest configuration and fixtures for NexOps backend tests.
+Pytest configuration and fixtures for NextSight backend tests.
 """
 import pytest
 import sys
+import os
+from pathlib import Path
+
+# Load test environment configuration before importing app
+test_env_file = Path(__file__).parent.parent / ".env.test"
+if test_env_file.exists():
+    from dotenv import load_dotenv
+    load_dotenv(test_env_file, override=True)
+else:
+    # Set minimal test environment variables if .env.test doesn't exist
+    os.environ.setdefault("USE_DATABASE_AUTH", "false")
+    os.environ.setdefault("REDIS_ENABLED", "false")
+    os.environ.setdefault("DEBUG", "true")
 
 # Set flag early
 APP_AVAILABLE = False

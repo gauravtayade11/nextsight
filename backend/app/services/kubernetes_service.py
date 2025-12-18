@@ -1,3 +1,4 @@
+import base64
 import logging
 import os
 from datetime import datetime, timezone
@@ -7,6 +8,8 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 from app.core.config import settings
+from app.core.cache import cache_service, CacheConfig
+from app.utils.security import validate_shell_command, validate_path_safe
 from app.schemas.kubernetes import (
     AppliedResourceInfo,
     ClusterMetrics,
@@ -18,6 +21,8 @@ from app.schemas.kubernetes import (
     HPAInfo,
     IngressInfo,
     IngressRule,
+    IngressCreateRequest,
+    IngressUpdateRequest,
     JobInfo,
     K8sClusterHealth,
     K8sEvent,
@@ -33,10 +38,24 @@ from app.schemas.kubernetes import (
     PodMetrics,
     PodPhase,
     PVCInfo,
+    PVCCreateRequest,
+    PVCUpdateRequest,
+    PVInfo,
+    ResourceDeleteResponse,
+    ResourceYAMLResponse,
     SecretInfo,
+    SecretDetail,
+    SecretCreateRequest,
+    SecretUpdateRequest,
     ServiceInfo,
+    ServiceCreateRequest,
+    ServiceUpdateRequest,
     ShellResponse,
     StatefulSetInfo,
+    StorageClassInfo,
+    StorageClassCreateRequest,
+    StorageClassUpdateRequest,
+    PVCreateRequest,
     YAMLApplyResponse,
 )
 
@@ -51,6 +70,7 @@ class KubernetesService:
         self._networking_v1 = None
         self._batch_v1 = None
         self._autoscaling_v1 = None
+        self._storage_v1 = None
         self._initialized = False
 
     def _initialize(self):
@@ -84,6 +104,7 @@ class KubernetesService:
             self._networking_v1 = client.NetworkingV1Api(self._api_client)
             self._batch_v1 = client.BatchV1Api(self._api_client)
             self._autoscaling_v1 = client.AutoscalingV1Api(self._api_client)
+            self._storage_v1 = client.StorageV1Api(self._api_client)
             self._initialized = True
         except Exception as e:
             logger.error(f"Failed to initialize Kubernetes client: {e}")
@@ -108,10 +129,16 @@ class KubernetesService:
             return f"{minutes}m"
 
     async def get_namespaces(self) -> List[NamespaceInfo]:
+        # Check cache first
+        cache_key = "k8s:namespaces"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return [NamespaceInfo(**ns) for ns in cached]
+
         self._initialize()
         try:
             namespaces = self._core_v1.list_namespace()
-            return [
+            result = [
                 NamespaceInfo(
                     name=ns.metadata.name,
                     status=ns.status.phase,
@@ -120,11 +147,116 @@ class KubernetesService:
                 )
                 for ns in namespaces.items
             ]
+            # Cache for 5 minutes
+            await cache_service.set(cache_key, [r.model_dump() for r in result], CacheConfig.NAMESPACES)
+            return result
         except ApiException as e:
             logger.error(f"Error listing namespaces: {e}")
             raise
 
+    async def get_namespaces_with_details(self) -> List["NamespaceDetail"]:
+        """Get all namespaces with resource counts."""
+        from app.schemas.kubernetes import NamespaceDetail
+        self._initialize()
+        try:
+            namespaces = self._core_v1.list_namespace()
+            result = []
+
+            for ns in namespaces.items:
+                ns_name = ns.metadata.name
+
+                # Get resource counts for this namespace
+                try:
+                    pods = self._core_v1.list_namespaced_pod(ns_name)
+                    pod_count = len(pods.items)
+                except Exception:
+                    pod_count = 0
+
+                try:
+                    deployments = self._apps_v1.list_namespaced_deployment(ns_name)
+                    deployment_count = len(deployments.items)
+                except Exception:
+                    deployment_count = 0
+
+                try:
+                    services = self._core_v1.list_namespaced_service(ns_name)
+                    service_count = len(services.items)
+                except Exception:
+                    service_count = 0
+
+                try:
+                    configmaps = self._core_v1.list_namespaced_config_map(ns_name)
+                    configmap_count = len(configmaps.items)
+                except Exception:
+                    configmap_count = 0
+
+                try:
+                    secrets = self._core_v1.list_namespaced_secret(ns_name)
+                    secret_count = len(secrets.items)
+                except Exception:
+                    secret_count = 0
+
+                age = self._calculate_age(ns.metadata.creation_timestamp)
+
+                result.append(NamespaceDetail(
+                    name=ns_name,
+                    status=ns.status.phase,
+                    created_at=ns.metadata.creation_timestamp,
+                    labels=ns.metadata.labels or {},
+                    age=age,
+                    pods=pod_count,
+                    deployments=deployment_count,
+                    services=service_count,
+                    configmaps=configmap_count,
+                    secrets=secret_count,
+                ))
+
+            return result
+        except ApiException as e:
+            logger.error(f"Error listing namespaces with details: {e}")
+            raise
+
+    async def create_namespace(self, request: "NamespaceCreateRequest") -> NamespaceInfo:
+        """Create a new namespace."""
+        from app.schemas.kubernetes import NamespaceCreateRequest
+        self._initialize()
+        try:
+            namespace = client.V1Namespace(
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    labels=request.labels or None,
+                )
+            )
+
+            created = self._core_v1.create_namespace(namespace)
+
+            return NamespaceInfo(
+                name=created.metadata.name,
+                status=created.status.phase,
+                created_at=created.metadata.creation_timestamp,
+                labels=created.metadata.labels or {},
+            )
+        except ApiException as e:
+            logger.error(f"Error creating namespace {request.name}: {e}")
+            raise
+
+    async def delete_namespace(self, name: str) -> bool:
+        """Delete a namespace."""
+        self._initialize()
+        try:
+            self._core_v1.delete_namespace(name)
+            return True
+        except ApiException as e:
+            logger.error(f"Error deleting namespace {name}: {e}")
+            raise
+
     async def get_pods(self, namespace: Optional[str] = None) -> List[PodInfo]:
+        # Check cache first
+        cache_key = f"k8s:pods:{namespace or 'all'}"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return [PodInfo(**p) for p in cached]
+
         self._initialize()
         try:
             if namespace:
@@ -151,12 +283,61 @@ class KubernetesService:
                         containers=[c.name for c in pod.spec.containers],
                     )
                 )
+            # Cache for 30 seconds
+            await cache_service.set(cache_key, [r.model_dump() for r in result], CacheConfig.PODS)
             return result
         except ApiException as e:
             logger.error(f"Error listing pods: {e}")
             raise
 
+    async def get_pods_on_node(self, node_name: str) -> List[PodInfo]:
+        """Get all pods running on a specific node."""
+        # Check cache first
+        cache_key = f"k8s:pods:node:{node_name}"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return [PodInfo(**p) for p in cached]
+
+        self._initialize()
+        try:
+            # Use field selector to filter pods by node
+            pods = self._core_v1.list_pod_for_all_namespaces(
+                field_selector=f"spec.nodeName={node_name}"
+            )
+
+            result = []
+            for pod in pods.items:
+                ready_containers = sum(1 for cs in (pod.status.container_statuses or []) if cs.ready)
+                total_containers = len(pod.spec.containers)
+                restarts = sum(cs.restart_count for cs in (pod.status.container_statuses or []))
+
+                result.append(
+                    PodInfo(
+                        name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        status=PodPhase(pod.status.phase),
+                        ready=ready_containers == total_containers,
+                        restarts=restarts,
+                        age=self._calculate_age(pod.metadata.creation_timestamp),
+                        node=pod.spec.node_name,
+                        ip=pod.status.pod_ip,
+                        containers=[c.name for c in pod.spec.containers],
+                    )
+                )
+            # Cache for 30 seconds
+            await cache_service.set(cache_key, [r.model_dump() for r in result], CacheConfig.PODS)
+            return result
+        except ApiException as e:
+            logger.error(f"Error listing pods on node {node_name}: {e}")
+            raise
+
     async def get_deployments(self, namespace: Optional[str] = None) -> List[DeploymentInfo]:
+        # Check cache first
+        cache_key = f"k8s:deployments:{namespace or 'all'}"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return [DeploymentInfo(**d) for d in cached]
+
         self._initialize()
         try:
             if namespace:
@@ -182,12 +363,61 @@ class KubernetesService:
                         labels=dep.metadata.labels or {},
                     )
                 )
+            # Cache for 1 minute
+            await cache_service.set(cache_key, [r.model_dump() for r in result], CacheConfig.DEPLOYMENTS)
             return result
         except ApiException as e:
             logger.error(f"Error listing deployments: {e}")
             raise
 
+    async def get_deployment(self, namespace: str, name: str) -> Optional[DeploymentInfo]:
+        """Get a specific deployment by name."""
+        self._initialize()
+        try:
+            dep = self._apps_v1.read_namespaced_deployment(name, namespace)
+            image = None
+            if dep.spec.template.spec.containers:
+                image = dep.spec.template.spec.containers[0].image
+
+            return DeploymentInfo(
+                name=dep.metadata.name,
+                namespace=dep.metadata.namespace,
+                replicas=dep.spec.replicas or 0,
+                ready_replicas=dep.status.ready_replicas or 0,
+                available_replicas=dep.status.available_replicas or 0,
+                image=image,
+                age=self._calculate_age(dep.metadata.creation_timestamp),
+                labels=dep.metadata.labels or {},
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            logger.error(f"Error getting deployment {namespace}/{name}: {e}")
+            raise
+
+    async def delete_deployment(self, namespace: str, name: str) -> ResourceDeleteResponse:
+        """Delete a deployment."""
+        self._initialize()
+        try:
+            self._apps_v1.delete_namespaced_deployment(name, namespace)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"Deployment {namespace}/{name} deleted successfully",
+                kind="Deployment",
+                name=name,
+                namespace=namespace,
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting deployment {namespace}/{name}: {e}")
+            raise
+
     async def get_services(self, namespace: Optional[str] = None) -> List[ServiceInfo]:
+        # Check cache first
+        cache_key = f"k8s:services:{namespace or 'all'}"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return [ServiceInfo(**s) for s in cached]
+
         self._initialize()
         try:
             if namespace:
@@ -223,12 +453,154 @@ class KubernetesService:
                         ports=ports,
                     )
                 )
+
+            # Cache for 2 minutes
+            await cache_service.set(cache_key, [r.model_dump() for r in result], CacheConfig.SERVICES)
             return result
         except ApiException as e:
             logger.error(f"Error listing services: {e}")
             raise
 
+    async def create_service(self, request: ServiceCreateRequest) -> ServiceInfo:
+        """Create a new Kubernetes Service."""
+        self._initialize()
+        try:
+            # Build service ports
+            ports = []
+            for p in request.ports:
+                port = client.V1ServicePort(
+                    name=p.name,
+                    port=p.port,
+                    target_port=p.target_port,
+                    protocol=p.protocol,
+                )
+                if request.type == "NodePort" and p.node_port:
+                    port.node_port = p.node_port
+                ports.append(port)
+
+            # Build service spec
+            service = client.V1Service(
+                api_version="v1",
+                kind="Service",
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    namespace=request.namespace,
+                    labels=request.labels or None,
+                    annotations=request.annotations or None,
+                ),
+                spec=client.V1ServiceSpec(
+                    type=request.type,
+                    selector=request.selector if request.selector else None,
+                    ports=ports if ports else None,
+                ),
+            )
+
+            created = self._core_v1.create_namespaced_service(request.namespace, service)
+
+            return ServiceInfo(
+                name=created.metadata.name,
+                namespace=created.metadata.namespace,
+                type=created.spec.type,
+                cluster_ip=created.spec.cluster_ip,
+                external_ip=None,
+                ports=[
+                    {
+                        "port": p.port,
+                        "target_port": str(p.target_port),
+                        "protocol": p.protocol,
+                        "name": p.name,
+                    }
+                    for p in (created.spec.ports or [])
+                ],
+            )
+        except ApiException as e:
+            logger.error(f"Error creating service {request.namespace}/{request.name}: {e}")
+            raise
+
+    async def update_service(self, namespace: str, name: str, request: ServiceUpdateRequest) -> ServiceInfo:
+        """Update an existing Kubernetes Service."""
+        self._initialize()
+        try:
+            # Get existing service
+            existing = self._core_v1.read_namespaced_service(name, namespace)
+
+            # Update fields if provided
+            if request.type is not None:
+                existing.spec.type = request.type
+
+            if request.selector is not None:
+                existing.spec.selector = request.selector
+
+            if request.ports is not None:
+                ports = []
+                for p in request.ports:
+                    port = client.V1ServicePort(
+                        name=p.name,
+                        port=p.port,
+                        target_port=p.target_port,
+                        protocol=p.protocol,
+                    )
+                    if existing.spec.type == "NodePort" and p.node_port:
+                        port.node_port = p.node_port
+                    ports.append(port)
+                existing.spec.ports = ports
+
+            if request.labels is not None:
+                existing.metadata.labels = request.labels
+
+            if request.annotations is not None:
+                existing.metadata.annotations = request.annotations
+
+            updated = self._core_v1.replace_namespaced_service(name, namespace, existing)
+
+            external_ips = updated.status.load_balancer.ingress if updated.status.load_balancer else None
+            external_ip = None
+            if external_ips and len(external_ips) > 0:
+                external_ip = external_ips[0].ip or external_ips[0].hostname
+
+            return ServiceInfo(
+                name=updated.metadata.name,
+                namespace=updated.metadata.namespace,
+                type=updated.spec.type,
+                cluster_ip=updated.spec.cluster_ip,
+                external_ip=external_ip,
+                ports=[
+                    {
+                        "port": p.port,
+                        "target_port": str(p.target_port),
+                        "protocol": p.protocol,
+                        "name": p.name,
+                    }
+                    for p in (updated.spec.ports or [])
+                ],
+            )
+        except ApiException as e:
+            logger.error(f"Error updating service {namespace}/{name}: {e}")
+            raise
+
+    async def delete_service(self, namespace: str, name: str) -> ResourceDeleteResponse:
+        """Delete a Kubernetes Service."""
+        self._initialize()
+        try:
+            self._core_v1.delete_namespaced_service(name, namespace)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"Service {namespace}/{name} deleted successfully",
+                kind="Service",
+                name=name,
+                namespace=namespace,
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting service {namespace}/{name}: {e}")
+            raise
+
     async def get_events(self, namespace: Optional[str] = None, limit: int = 100) -> List[K8sEvent]:
+        # Check cache first (short TTL for events - 15 seconds)
+        cache_key = f"k8s:events:{namespace or 'all'}:{limit}"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return [K8sEvent(**e) for e in cached]
+
         self._initialize()
         try:
             if namespace:
@@ -255,6 +627,9 @@ class KubernetesService:
                         },
                     )
                 )
+
+            # Cache for 15 seconds (events change frequently)
+            await cache_service.set(cache_key, [r.model_dump() for r in result], CacheConfig.EVENTS)
             return result
         except ApiException as e:
             logger.error(f"Error listing events: {e}")
@@ -328,6 +703,12 @@ class KubernetesService:
             raise
 
     async def get_cluster_health(self) -> K8sClusterHealth:
+        # Check cache first (short TTL for health data)
+        cache_key = "k8s:cluster_health"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return K8sClusterHealth(**cached)
+
         self._initialize()
         try:
             nodes = self._core_v1.list_node()
@@ -352,7 +733,7 @@ class KubernetesService:
             if failed_pods > 0:
                 warnings.append(f"{failed_pods} pods are in Failed state")
 
-            return K8sClusterHealth(
+            result = K8sClusterHealth(
                 healthy=ready_nodes == len(nodes.items) and len(warnings) == 0,
                 node_count=len(nodes.items),
                 ready_nodes=ready_nodes,
@@ -361,12 +742,21 @@ class KubernetesService:
                 namespaces=len(namespaces.items),
                 warnings=warnings,
             )
+            # Cache for 10 seconds (cluster health changes frequently)
+            await cache_service.set(cache_key, result.model_dump(), CacheConfig.CLUSTER_METRICS)
+            return result
         except ApiException as e:
             logger.error(f"Error getting cluster health: {e}")
             raise
 
     async def get_nodes(self) -> List[NodeInfo]:
         """Get all nodes with detailed information."""
+        # Check cache first
+        cache_key = "k8s:nodes"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return [NodeInfo(**n) for n in cached]
+
         self._initialize()
         try:
             nodes = self._core_v1.list_node()
@@ -390,9 +780,13 @@ class KubernetesService:
 
                 # Extract roles from labels
                 roles = []
+                role_prefix = "node-role.kubernetes.io/"
                 for label in node.metadata.labels or {}:
-                    if label.startswith("node-role.kubernetes.io/"):
-                        roles.append(label.split("/")[-1])
+                    if label.startswith(role_prefix):
+                        # Extract role name after the prefix
+                        role_name = label[len(role_prefix):]
+                        if role_name:  # Only add non-empty roles
+                            roles.append(role_name)
                 if not roles:
                     roles = ["worker"]
 
@@ -439,6 +833,9 @@ class KubernetesService:
                         taints=taints,
                     )
                 )
+
+            # Cache the result for 1 minute
+            await cache_service.set(cache_key, [r.model_dump() for r in result], CacheConfig.NODES)
             return result
         except ApiException as e:
             logger.error(f"Error listing nodes: {e}")
@@ -605,6 +1002,12 @@ class KubernetesService:
 
     async def get_cluster_metrics(self) -> Optional[ClusterMetrics]:
         """Get overall cluster resource metrics."""
+        # Check cache first (short TTL - 10 seconds for real-time metrics)
+        cache_key = "k8s:cluster_metrics"
+        cached = await cache_service.get(cache_key)
+        if cached is not None:
+            return ClusterMetrics(**cached)
+
         self._initialize()
         try:
             node_metrics = await self.get_node_metrics()
@@ -622,7 +1025,7 @@ class KubernetesService:
             total_cpu_usage = sum(self._parse_cpu(n.cpu_usage) for n in node_metrics)
             total_memory_usage = sum(self._parse_memory(n.memory_usage) for n in node_metrics)
 
-            return ClusterMetrics(
+            result = ClusterMetrics(
                 total_cpu_capacity=f"{total_cpu_capacity // 1000000}m",
                 total_cpu_usage=f"{total_cpu_usage // 1000000}m",
                 cpu_percent=round((total_cpu_usage / total_cpu_capacity * 100) if total_cpu_capacity > 0 else 0, 1),
@@ -634,6 +1037,10 @@ class KubernetesService:
                 nodes=node_metrics,
                 timestamp=datetime.now(timezone.utc),
             )
+
+            # Cache for 10 seconds
+            await cache_service.set(cache_key, result.model_dump(), CacheConfig.CLUSTER_METRICS)
+            return result
         except Exception as e:
             logger.error(f"Error getting cluster metrics: {e}")
             return None
@@ -789,6 +1196,183 @@ class KubernetesService:
             logger.error(f"Error listing ingresses: {e}")
             raise
 
+    async def create_ingress(self, request: IngressCreateRequest) -> IngressInfo:
+        """Create a new Kubernetes Ingress."""
+        self._initialize()
+        try:
+            # Build ingress rules
+            rules = []
+            for rule_spec in request.rules:
+                paths = []
+                for path_spec in rule_spec.paths:
+                    paths.append(
+                        client.V1HTTPIngressPath(
+                            path=path_spec.path,
+                            path_type=path_spec.path_type,
+                            backend=client.V1IngressBackend(
+                                service=client.V1IngressServiceBackend(
+                                    name=path_spec.service_name,
+                                    port=client.V1ServiceBackendPort(number=path_spec.service_port),
+                                )
+                            ),
+                        )
+                    )
+                rules.append(
+                    client.V1IngressRule(
+                        host=rule_spec.host,
+                        http=client.V1HTTPIngressRuleValue(paths=paths) if paths else None,
+                    )
+                )
+
+            # Build TLS config
+            tls = []
+            for tls_spec in request.tls:
+                tls.append(
+                    client.V1IngressTLS(
+                        hosts=tls_spec.hosts if tls_spec.hosts else None,
+                        secret_name=tls_spec.secret_name,
+                    )
+                )
+
+            # Build ingress
+            ingress = client.V1Ingress(
+                api_version="networking.k8s.io/v1",
+                kind="Ingress",
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    namespace=request.namespace,
+                    labels=request.labels or None,
+                    annotations=request.annotations or None,
+                ),
+                spec=client.V1IngressSpec(
+                    ingress_class_name=request.ingress_class_name,
+                    rules=rules if rules else None,
+                    tls=tls if tls else None,
+                ),
+            )
+
+            created = self._networking_v1.create_namespaced_ingress(request.namespace, ingress)
+
+            # Extract hosts from rules
+            hosts = []
+            for rule in created.spec.rules or []:
+                if rule.host:
+                    hosts.append(rule.host)
+
+            return IngressInfo(
+                name=created.metadata.name,
+                namespace=created.metadata.namespace,
+                class_name=created.spec.ingress_class_name,
+                hosts=hosts,
+                address=None,
+                rules=[],
+                tls=[{"hosts": t.hosts, "secret": t.secret_name} for t in (created.spec.tls or [])],
+                age="0m",
+                labels=created.metadata.labels or {},
+                annotations=created.metadata.annotations or {},
+            )
+        except ApiException as e:
+            logger.error(f"Error creating ingress {request.namespace}/{request.name}: {e}")
+            raise
+
+    async def update_ingress(self, namespace: str, name: str, request: IngressUpdateRequest) -> IngressInfo:
+        """Update an existing Kubernetes Ingress."""
+        self._initialize()
+        try:
+            # Get existing ingress
+            existing = self._networking_v1.read_namespaced_ingress(name, namespace)
+
+            # Update fields if provided
+            if request.ingress_class_name is not None:
+                existing.spec.ingress_class_name = request.ingress_class_name
+
+            if request.rules is not None:
+                rules = []
+                for rule_spec in request.rules:
+                    paths = []
+                    for path_spec in rule_spec.paths:
+                        paths.append(
+                            client.V1HTTPIngressPath(
+                                path=path_spec.path,
+                                path_type=path_spec.path_type,
+                                backend=client.V1IngressBackend(
+                                    service=client.V1IngressServiceBackend(
+                                        name=path_spec.service_name,
+                                        port=client.V1ServiceBackendPort(number=path_spec.service_port),
+                                    )
+                                ),
+                            )
+                        )
+                    rules.append(
+                        client.V1IngressRule(
+                            host=rule_spec.host,
+                            http=client.V1HTTPIngressRuleValue(paths=paths) if paths else None,
+                        )
+                    )
+                existing.spec.rules = rules
+
+            if request.tls is not None:
+                tls = []
+                for tls_spec in request.tls:
+                    tls.append(
+                        client.V1IngressTLS(
+                            hosts=tls_spec.hosts if tls_spec.hosts else None,
+                            secret_name=tls_spec.secret_name,
+                        )
+                    )
+                existing.spec.tls = tls
+
+            if request.labels is not None:
+                existing.metadata.labels = request.labels
+
+            if request.annotations is not None:
+                existing.metadata.annotations = request.annotations
+
+            updated = self._networking_v1.replace_namespaced_ingress(name, namespace, existing)
+
+            # Extract hosts from rules
+            hosts = []
+            for rule in updated.spec.rules or []:
+                if rule.host:
+                    hosts.append(rule.host)
+
+            address = None
+            if updated.status.load_balancer and updated.status.load_balancer.ingress:
+                lb = updated.status.load_balancer.ingress[0]
+                address = lb.ip or lb.hostname
+
+            return IngressInfo(
+                name=updated.metadata.name,
+                namespace=updated.metadata.namespace,
+                class_name=updated.spec.ingress_class_name,
+                hosts=hosts,
+                address=address,
+                rules=[],
+                tls=[{"hosts": t.hosts, "secret": t.secret_name} for t in (updated.spec.tls or [])],
+                age=self._calculate_age(updated.metadata.creation_timestamp),
+                labels=updated.metadata.labels or {},
+                annotations=updated.metadata.annotations or {},
+            )
+        except ApiException as e:
+            logger.error(f"Error updating ingress {namespace}/{name}: {e}")
+            raise
+
+    async def delete_ingress(self, namespace: str, name: str) -> ResourceDeleteResponse:
+        """Delete a Kubernetes Ingress."""
+        self._initialize()
+        try:
+            self._networking_v1.delete_namespaced_ingress(name, namespace)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"Ingress {namespace}/{name} deleted successfully",
+                kind="Ingress",
+                name=name,
+                namespace=namespace,
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting ingress {namespace}/{name}: {e}")
+            raise
+
     async def get_configmaps(self, namespace: Optional[str] = None) -> List[ConfigMapInfo]:
         """Get all configmaps (keys only, not values)."""
         self._initialize()
@@ -814,6 +1398,82 @@ class KubernetesService:
             return result
         except ApiException as e:
             logger.error(f"Error listing configmaps: {e}")
+            raise
+
+    async def get_configmap(self, namespace: str, name: str) -> "ConfigMapDetail":
+        """Get a single ConfigMap with full data values."""
+        from app.schemas.kubernetes import ConfigMapDetail
+        self._initialize()
+        try:
+            cm = self._core_v1.read_namespaced_config_map(name, namespace)
+
+            created_at = None
+            if cm.metadata.creation_timestamp:
+                created_at = cm.metadata.creation_timestamp.isoformat()
+
+            return ConfigMapDetail(
+                name=cm.metadata.name,
+                namespace=cm.metadata.namespace,
+                data=cm.data or {},
+                binary_data_keys=list((cm.binary_data or {}).keys()),
+                labels=cm.metadata.labels or {},
+                annotations=cm.metadata.annotations or {},
+                created_at=created_at,
+            )
+        except ApiException as e:
+            logger.error(f"Error getting configmap {namespace}/{name}: {e}")
+            raise
+
+    async def create_configmap(self, request: "ConfigMapCreateRequest") -> "ConfigMapDetail":
+        """Create a new ConfigMap."""
+        from app.schemas.kubernetes import ConfigMapCreateRequest, ConfigMapDetail
+        self._initialize()
+        try:
+            configmap = client.V1ConfigMap(
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    namespace=request.namespace,
+                    labels=request.labels or None,
+                ),
+                data=request.data if request.data else None,
+            )
+
+            self._core_v1.create_namespaced_config_map(request.namespace, configmap)
+
+            return await self.get_configmap(request.namespace, request.name)
+        except ApiException as e:
+            logger.error(f"Error creating configmap {request.namespace}/{request.name}: {e}")
+            raise
+
+    async def update_configmap(self, namespace: str, name: str, request: "ConfigMapUpdateRequest") -> "ConfigMapDetail":
+        """Update an existing ConfigMap."""
+        from app.schemas.kubernetes import ConfigMapUpdateRequest, ConfigMapDetail
+        self._initialize()
+        try:
+            # Get existing configmap
+            existing = self._core_v1.read_namespaced_config_map(name, namespace)
+
+            # Update data
+            existing.data = request.data if request.data else None
+
+            if request.labels is not None:
+                existing.metadata.labels = request.labels
+
+            self._core_v1.replace_namespaced_config_map(name, namespace, existing)
+
+            return await self.get_configmap(namespace, name)
+        except ApiException as e:
+            logger.error(f"Error updating configmap {namespace}/{name}: {e}")
+            raise
+
+    async def delete_configmap(self, namespace: str, name: str) -> bool:
+        """Delete a ConfigMap."""
+        self._initialize()
+        try:
+            self._core_v1.delete_namespaced_config_map(name, namespace)
+            return True
+        except ApiException as e:
+            logger.error(f"Error deleting configmap {namespace}/{name}: {e}")
             raise
 
     async def get_secrets(self, namespace: Optional[str] = None) -> List[SecretInfo]:
@@ -842,6 +1502,100 @@ class KubernetesService:
             return result
         except ApiException as e:
             logger.error(f"Error listing secrets: {e}")
+            raise
+
+    async def get_secret(self, namespace: str, name: str) -> SecretDetail:
+        """Get a single secret with decoded data values."""
+        self._initialize()
+        try:
+            secret = self._core_v1.read_namespaced_secret(name, namespace)
+
+            # Decode base64 data values
+            decoded_data = {}
+            if secret.data:
+                for key, value in secret.data.items():
+                    try:
+                        decoded_data[key] = base64.b64decode(value).decode('utf-8')
+                    except (UnicodeDecodeError, ValueError):
+                        # Binary data - show as base64
+                        decoded_data[key] = f"[binary data: {value[:50]}...]" if len(value) > 50 else f"[binary: {value}]"
+
+            created_at = None
+            if secret.metadata.creation_timestamp:
+                created_at = secret.metadata.creation_timestamp.isoformat()
+
+            return SecretDetail(
+                name=secret.metadata.name,
+                namespace=secret.metadata.namespace,
+                type=secret.type,
+                data=decoded_data,
+                labels=secret.metadata.labels or {},
+                annotations=secret.metadata.annotations or {},
+                created_at=created_at,
+            )
+        except ApiException as e:
+            logger.error(f"Error getting secret {namespace}/{name}: {e}")
+            raise
+
+    async def create_secret(self, request: SecretCreateRequest) -> SecretDetail:
+        """Create a new secret."""
+        self._initialize()
+        try:
+            # Encode data values to base64
+            encoded_data = {}
+            for key, value in request.data.items():
+                encoded_data[key] = base64.b64encode(value.encode('utf-8')).decode('utf-8')
+
+            secret = client.V1Secret(
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    namespace=request.namespace,
+                    labels=request.labels or None,
+                ),
+                type=request.type,
+                data=encoded_data if encoded_data else None,
+            )
+
+            created = self._core_v1.create_namespaced_secret(request.namespace, secret)
+
+            return await self.get_secret(request.namespace, request.name)
+        except ApiException as e:
+            logger.error(f"Error creating secret {request.namespace}/{request.name}: {e}")
+            raise
+
+    async def update_secret(self, namespace: str, name: str, request: SecretUpdateRequest) -> SecretDetail:
+        """Update an existing secret."""
+        self._initialize()
+        try:
+            # Get existing secret
+            existing = self._core_v1.read_namespaced_secret(name, namespace)
+
+            # Encode new data values to base64
+            encoded_data = {}
+            for key, value in request.data.items():
+                encoded_data[key] = base64.b64encode(value.encode('utf-8')).decode('utf-8')
+
+            # Update the secret
+            existing.data = encoded_data if encoded_data else None
+
+            if request.labels is not None:
+                existing.metadata.labels = request.labels
+
+            self._core_v1.replace_namespaced_secret(name, namespace, existing)
+
+            return await self.get_secret(namespace, name)
+        except ApiException as e:
+            logger.error(f"Error updating secret {namespace}/{name}: {e}")
+            raise
+
+    async def delete_secret(self, namespace: str, name: str) -> bool:
+        """Delete a secret."""
+        self._initialize()
+        try:
+            self._core_v1.delete_namespaced_secret(name, namespace)
+            return True
+        except ApiException as e:
+            logger.error(f"Error deleting secret {namespace}/{name}: {e}")
             raise
 
     async def get_pvcs(self, namespace: Optional[str] = None) -> List[PVCInfo]:
@@ -910,6 +1664,83 @@ class KubernetesService:
             logger.error(f"Error listing statefulsets: {e}")
             raise
 
+    async def get_statefulset(self, namespace: str, name: str) -> Optional[StatefulSetInfo]:
+        """Get a specific statefulset by name."""
+        self._initialize()
+        try:
+            sts = self._apps_v1.read_namespaced_stateful_set(name, namespace)
+            image = None
+            if sts.spec.template.spec.containers:
+                image = sts.spec.template.spec.containers[0].image
+
+            return StatefulSetInfo(
+                name=sts.metadata.name,
+                namespace=sts.metadata.namespace,
+                replicas=sts.spec.replicas or 0,
+                ready_replicas=sts.status.ready_replicas or 0,
+                current_replicas=sts.status.current_replicas or 0,
+                image=image,
+                service_name=sts.spec.service_name,
+                age=self._calculate_age(sts.metadata.creation_timestamp),
+                labels=sts.metadata.labels or {},
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            logger.error(f"Error getting statefulset {namespace}/{name}: {e}")
+            raise
+
+    async def delete_statefulset(self, namespace: str, name: str) -> ResourceDeleteResponse:
+        """Delete a statefulset."""
+        self._initialize()
+        try:
+            self._apps_v1.delete_namespaced_stateful_set(name, namespace)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"StatefulSet {namespace}/{name} deleted successfully",
+                kind="StatefulSet",
+                name=name,
+                namespace=namespace,
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting statefulset {namespace}/{name}: {e}")
+            raise
+
+    async def scale_statefulset(self, namespace: str, name: str, replicas: int) -> Dict[str, Any]:
+        """Scale a statefulset to the specified number of replicas."""
+        self._initialize()
+        try:
+            body = {"spec": {"replicas": replicas}}
+            self._apps_v1.patch_namespaced_stateful_set_scale(name=name, namespace=namespace, body=body)
+            return {
+                "success": True,
+                "message": f"Scaled {name} to {replicas} replicas",
+                "statefulset": name,
+                "namespace": namespace,
+                "replicas": replicas,
+            }
+        except ApiException as e:
+            logger.error(f"Error scaling statefulset: {e}")
+            raise
+
+    async def restart_statefulset(self, namespace: str, name: str) -> Dict[str, Any]:
+        """Restart a statefulset by updating its pod template."""
+        self._initialize()
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            body = {"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": now}}}}}
+            self._apps_v1.patch_namespaced_stateful_set(name=name, namespace=namespace, body=body)
+            return {
+                "success": True,
+                "message": f"Restarted statefulset {name}",
+                "statefulset": name,
+                "namespace": namespace,
+                "timestamp": now,
+            }
+        except ApiException as e:
+            logger.error(f"Error restarting statefulset: {e}")
+            raise
+
     async def get_daemonsets(self, namespace: Optional[str] = None) -> List[DaemonSetInfo]:
         """Get all daemonsets."""
         self._initialize()
@@ -944,6 +1775,67 @@ class KubernetesService:
             logger.error(f"Error listing daemonsets: {e}")
             raise
 
+    async def get_daemonset(self, namespace: str, name: str) -> Optional[DaemonSetInfo]:
+        """Get a specific daemonset by name."""
+        self._initialize()
+        try:
+            ds = self._apps_v1.read_namespaced_daemon_set(name, namespace)
+            image = None
+            if ds.spec.template.spec.containers:
+                image = ds.spec.template.spec.containers[0].image
+
+            return DaemonSetInfo(
+                name=ds.metadata.name,
+                namespace=ds.metadata.namespace,
+                desired=ds.status.desired_number_scheduled or 0,
+                current=ds.status.current_number_scheduled or 0,
+                ready=ds.status.number_ready or 0,
+                available=ds.status.number_available or 0,
+                node_selector=ds.spec.template.spec.node_selector or {},
+                image=image,
+                age=self._calculate_age(ds.metadata.creation_timestamp),
+                labels=ds.metadata.labels or {},
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            logger.error(f"Error getting daemonset {namespace}/{name}: {e}")
+            raise
+
+    async def delete_daemonset(self, namespace: str, name: str) -> ResourceDeleteResponse:
+        """Delete a daemonset."""
+        self._initialize()
+        try:
+            self._apps_v1.delete_namespaced_daemon_set(name, namespace)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"DaemonSet {namespace}/{name} deleted successfully",
+                kind="DaemonSet",
+                name=name,
+                namespace=namespace,
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting daemonset {namespace}/{name}: {e}")
+            raise
+
+    async def restart_daemonset(self, namespace: str, name: str) -> Dict[str, Any]:
+        """Restart a daemonset by updating its pod template."""
+        self._initialize()
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            body = {"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": now}}}}}
+            self._apps_v1.patch_namespaced_daemon_set(name=name, namespace=namespace, body=body)
+            return {
+                "success": True,
+                "message": f"Restarted daemonset {name}",
+                "daemonset": name,
+                "namespace": namespace,
+                "timestamp": now,
+            }
+        except ApiException as e:
+            logger.error(f"Error restarting daemonset: {e}")
+            raise
+
     async def get_jobs(self, namespace: Optional[str] = None) -> List[JobInfo]:
         """Get all jobs."""
         self._initialize()
@@ -976,6 +1868,49 @@ class KubernetesService:
             return result
         except ApiException as e:
             logger.error(f"Error listing jobs: {e}")
+            raise
+
+    async def get_job(self, namespace: str, name: str) -> Optional[JobInfo]:
+        """Get a specific job by name."""
+        self._initialize()
+        try:
+            job = self._batch_v1.read_namespaced_job(name, namespace)
+            duration = None
+            if job.status.start_time and job.status.completion_time:
+                delta = job.status.completion_time - job.status.start_time
+                duration = f"{int(delta.total_seconds())}s"
+
+            return JobInfo(
+                name=job.metadata.name,
+                namespace=job.metadata.namespace,
+                completions=job.spec.completions,
+                succeeded=job.status.succeeded or 0,
+                failed=job.status.failed or 0,
+                active=job.status.active or 0,
+                duration=duration,
+                age=self._calculate_age(job.metadata.creation_timestamp),
+                labels=job.metadata.labels or {},
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            logger.error(f"Error getting job {namespace}/{name}: {e}")
+            raise
+
+    async def delete_job(self, namespace: str, name: str) -> ResourceDeleteResponse:
+        """Delete a job."""
+        self._initialize()
+        try:
+            self._batch_v1.delete_namespaced_job(name, namespace)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"Job {namespace}/{name} deleted successfully",
+                kind="Job",
+                name=name,
+                namespace=namespace,
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting job {namespace}/{name}: {e}")
             raise
 
     async def get_cronjobs(self, namespace: Optional[str] = None) -> List[CronJobInfo]:
@@ -1313,51 +2248,47 @@ class KubernetesService:
         start_time = time.time()
 
         # Determine working directory
+        # Validate working directory to prevent path traversal
         if working_directory:
-            cwd = os.path.expanduser(working_directory)
-        else:
-            cwd = os.path.expanduser("~")
-
-        # Security: Block extremely dangerous commands
-        dangerous_patterns = [
-            "rm -rf /",
-            "rm -rf /*",
-            "mkfs",
-            "dd if=",
-            ":(){ :|:& };:",  # fork bomb
-            "chmod -R 777 /",
-            "chown -R",
-            "> /dev/sda",
-            "mv /* ",
-            "wget .* \\| sh",
-            "curl .* \\| sh",
-            "sudo su",
-            "sudo -i",
-            "passwd",
-            "useradd",
-            "userdel",
-            "groupadd",
-            "groupdel",
-        ]
-
-        command_lower = command.lower()
-        for pattern in dangerous_patterns:
-            if pattern in command_lower:
+            try:
+                validate_path_safe(working_directory)
+                cwd = os.path.expanduser(working_directory)
+            except Exception as e:
                 return ShellResponse(
                     success=False,
                     command=command,
                     stdout="",
-                    stderr=f"Command blocked: This command pattern is not allowed for security reasons",
+                    stderr=f"Invalid working directory: {str(e)}",
                     exit_code=1,
                     execution_time=0.0,
-                    working_directory=cwd,
+                    working_directory=working_directory,
                 )
+        else:
+            cwd = os.path.expanduser("~")
+
+        # Security: Validate command against dangerous patterns
+        try:
+            validate_shell_command(command)
+        except Exception as e:
+            return ShellResponse(
+                success=False,
+                command=command,
+                stdout="",
+                stderr=f"Command blocked: {str(e)}",
+                exit_code=1,
+                execution_time=0.0,
+                working_directory=cwd,
+            )
 
         try:
             # Execute the command using shell
+            # NOTE: shell=True is required for shell features (pipes, redirects, etc.)
+            # but poses security risks. Commands are validated against dangerous patterns above.
+            # This endpoint should be protected with strong authentication and authorization.
+            # Consider using a more restrictive shell or sandboxed environment in production.
             result = subprocess.run(
                 command,
-                shell=True,
+                shell=True,  # nosec B602 - Intentional, protected by auth and pattern blocking
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -1580,6 +2511,432 @@ class KubernetesService:
                 "target_revision": revision,
                 "error": str(e),
             }
+    # ==================== Storage CRUD Operations ====================
+
+    async def get_pvs(self) -> List[PVInfo]:
+        """Get all PersistentVolumes."""
+        self._initialize()
+        try:
+            pvs = self._core_v1.list_persistent_volume()
+            result = []
+            for pv in pvs.items:
+                capacity = pv.spec.capacity.get("storage", "") if pv.spec.capacity else ""
+                claim = None
+                if pv.spec.claim_ref:
+                    claim = f"{pv.spec.claim_ref.namespace}/{pv.spec.claim_ref.name}"
+
+                result.append(
+                    PVInfo(
+                        name=pv.metadata.name,
+                        capacity=capacity,
+                        access_modes=pv.spec.access_modes or [],
+                        reclaim_policy=pv.spec.persistent_volume_reclaim_policy or "Retain",
+                        status=pv.status.phase or "Unknown",
+                        claim=claim,
+                        storage_class=pv.spec.storage_class_name,
+                        volume_mode=pv.spec.volume_mode,
+                        age=self._calculate_age(pv.metadata.creation_timestamp),
+                        labels=pv.metadata.labels or {},
+                    )
+                )
+            return result
+        except ApiException as e:
+            logger.error(f"Error listing PVs: {e}")
+            raise
+
+    async def get_storage_classes(self) -> List[StorageClassInfo]:
+        """Get all StorageClasses."""
+        self._initialize()
+        try:
+            scs = self._storage_v1.list_storage_class()
+            result = []
+            for sc in scs.items:
+                is_default = False
+                annotations = sc.metadata.annotations or {}
+                if annotations.get("storageclass.kubernetes.io/is-default-class") == "true":
+                    is_default = True
+                if annotations.get("storageclass.beta.kubernetes.io/is-default-class") == "true":
+                    is_default = True
+
+                result.append(
+                    StorageClassInfo(
+                        name=sc.metadata.name,
+                        provisioner=sc.provisioner,
+                        reclaim_policy=sc.reclaim_policy or "Delete",
+                        volume_binding_mode=sc.volume_binding_mode or "Immediate",
+                        allow_volume_expansion=sc.allow_volume_expansion or False,
+                        is_default=is_default,
+                        parameters=sc.parameters or {},
+                        age=self._calculate_age(sc.metadata.creation_timestamp),
+                    )
+                )
+            return result
+        except ApiException as e:
+            logger.error(f"Error listing StorageClasses: {e}")
+            raise
+
+    async def create_pvc(self, request: PVCCreateRequest) -> PVCInfo:
+        """Create a new PersistentVolumeClaim."""
+        self._initialize()
+        try:
+            pvc = client.V1PersistentVolumeClaim(
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    namespace=request.namespace,
+                    labels=request.labels or {},
+                    annotations=request.annotations or {},
+                ),
+                spec=client.V1PersistentVolumeClaimSpec(
+                    access_modes=request.access_modes,
+                    resources=client.V1ResourceRequirements(
+                        requests={"storage": request.storage}
+                    ),
+                    storage_class_name=request.storage_class_name,
+                    volume_mode=request.volume_mode,
+                ),
+            )
+
+            created = self._core_v1.create_namespaced_persistent_volume_claim(
+                namespace=request.namespace, body=pvc
+            )
+
+            return PVCInfo(
+                name=created.metadata.name,
+                namespace=created.metadata.namespace,
+                status=created.status.phase or "Pending",
+                volume=created.spec.volume_name,
+                capacity=request.storage,
+                access_modes=created.spec.access_modes or [],
+                storage_class=created.spec.storage_class_name,
+                age=self._calculate_age(created.metadata.creation_timestamp),
+                labels=created.metadata.labels or {},
+            )
+        except ApiException as e:
+            logger.error(f"Error creating PVC: {e}")
+            raise
+
+    async def update_pvc(self, namespace: str, name: str, request: PVCUpdateRequest) -> PVCInfo:
+        """Update a PersistentVolumeClaim (storage expansion if supported)."""
+        self._initialize()
+        try:
+            # Get existing PVC
+            pvc = self._core_v1.read_namespaced_persistent_volume_claim(name, namespace)
+
+            # Update labels/annotations
+            if request.labels is not None:
+                pvc.metadata.labels = request.labels
+            if request.annotations is not None:
+                pvc.metadata.annotations = request.annotations
+
+            # Update storage size (expansion)
+            if request.storage:
+                pvc.spec.resources.requests["storage"] = request.storage
+
+            updated = self._core_v1.patch_namespaced_persistent_volume_claim(
+                name, namespace, pvc
+            )
+
+            capacity = None
+            if updated.status.capacity:
+                capacity = updated.status.capacity.get("storage")
+
+            return PVCInfo(
+                name=updated.metadata.name,
+                namespace=updated.metadata.namespace,
+                status=updated.status.phase or "Unknown",
+                volume=updated.spec.volume_name,
+                capacity=capacity,
+                access_modes=updated.spec.access_modes or [],
+                storage_class=updated.spec.storage_class_name,
+                age=self._calculate_age(updated.metadata.creation_timestamp),
+                labels=updated.metadata.labels or {},
+            )
+        except ApiException as e:
+            logger.error(f"Error updating PVC {namespace}/{name}: {e}")
+            raise
+
+    async def delete_pvc(self, namespace: str, name: str) -> ResourceDeleteResponse:
+        """Delete a PersistentVolumeClaim."""
+        self._initialize()
+        try:
+            self._core_v1.delete_namespaced_persistent_volume_claim(name, namespace)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"PersistentVolumeClaim '{name}' deleted successfully",
+                kind="PersistentVolumeClaim",
+                name=name,
+                namespace=namespace,
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting PVC {namespace}/{name}: {e}")
+            raise
+
+    async def create_pv(self, request: PVCreateRequest) -> PVInfo:
+        """Create a new PersistentVolume."""
+        self._initialize()
+        try:
+            # Build volume source
+            volume_source = {}
+            if request.host_path:
+                volume_source["hostPath"] = client.V1HostPathVolumeSource(
+                    path=request.host_path
+                )
+            elif request.nfs_server and request.nfs_path:
+                volume_source["nfs"] = client.V1NFSVolumeSource(
+                    server=request.nfs_server,
+                    path=request.nfs_path,
+                )
+
+            pv = client.V1PersistentVolume(
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    labels=request.labels or {},
+                    annotations=request.annotations or {},
+                ),
+                spec=client.V1PersistentVolumeSpec(
+                    capacity={"storage": request.capacity},
+                    access_modes=request.access_modes,
+                    persistent_volume_reclaim_policy=request.reclaim_policy,
+                    storage_class_name=request.storage_class_name,
+                    volume_mode=request.volume_mode,
+                    **volume_source,
+                ),
+            )
+
+            created = self._core_v1.create_persistent_volume(body=pv)
+
+            return PVInfo(
+                name=created.metadata.name,
+                capacity=request.capacity,
+                access_modes=created.spec.access_modes or [],
+                reclaim_policy=created.spec.persistent_volume_reclaim_policy or "Retain",
+                status=created.status.phase or "Available",
+                claim=None,
+                storage_class=created.spec.storage_class_name,
+                volume_mode=created.spec.volume_mode,
+                age=self._calculate_age(created.metadata.creation_timestamp),
+                labels=created.metadata.labels or {},
+            )
+        except ApiException as e:
+            logger.error(f"Error creating PV: {e}")
+            raise
+
+    async def delete_pv(self, name: str) -> ResourceDeleteResponse:
+        """Delete a PersistentVolume."""
+        self._initialize()
+        try:
+            self._core_v1.delete_persistent_volume(name)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"PersistentVolume '{name}' deleted successfully",
+                kind="PersistentVolume",
+                name=name,
+                namespace="",
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting PV {name}: {e}")
+            raise
+
+    async def create_storage_class(self, request: StorageClassCreateRequest) -> StorageClassInfo:
+        """Create a new StorageClass."""
+        self._initialize()
+        try:
+            annotations = {}
+            if request.is_default:
+                annotations["storageclass.kubernetes.io/is-default-class"] = "true"
+
+            sc = client.V1StorageClass(
+                metadata=client.V1ObjectMeta(
+                    name=request.name,
+                    annotations=annotations if annotations else None,
+                ),
+                provisioner=request.provisioner,
+                reclaim_policy=request.reclaim_policy,
+                volume_binding_mode=request.volume_binding_mode,
+                allow_volume_expansion=request.allow_volume_expansion,
+                parameters=request.parameters or None,
+                mount_options=request.mount_options or None,
+            )
+
+            created = self._storage_v1.create_storage_class(body=sc)
+
+            return StorageClassInfo(
+                name=created.metadata.name,
+                provisioner=created.provisioner,
+                reclaim_policy=created.reclaim_policy or "Delete",
+                volume_binding_mode=created.volume_binding_mode or "Immediate",
+                allow_volume_expansion=created.allow_volume_expansion or False,
+                is_default=request.is_default,
+                parameters=created.parameters or {},
+                age=self._calculate_age(created.metadata.creation_timestamp),
+            )
+        except ApiException as e:
+            logger.error(f"Error creating StorageClass: {e}")
+            raise
+
+    async def delete_storage_class(self, name: str) -> ResourceDeleteResponse:
+        """Delete a StorageClass."""
+        self._initialize()
+        try:
+            self._storage_v1.delete_storage_class(name)
+            return ResourceDeleteResponse(
+                success=True,
+                message=f"StorageClass '{name}' deleted successfully",
+                kind="StorageClass",
+                name=name,
+                namespace="",
+            )
+        except ApiException as e:
+            logger.error(f"Error deleting StorageClass {name}: {e}")
+            raise
+
+    async def get_resource_yaml(self, kind: str, name: str, namespace: Optional[str] = None) -> ResourceYAMLResponse:
+        """Get the YAML definition of any Kubernetes resource."""
+        import yaml
+
+        self._initialize()
+        try:
+            resource = None
+            kind_lower = kind.lower()
+
+            # Map resource kinds to their API methods
+            if kind_lower == "deployment":
+                resource = self._apps_v1.read_namespaced_deployment(name, namespace)
+            elif kind_lower == "statefulset":
+                resource = self._apps_v1.read_namespaced_stateful_set(name, namespace)
+            elif kind_lower == "daemonset":
+                resource = self._apps_v1.read_namespaced_daemon_set(name, namespace)
+            elif kind_lower == "job":
+                resource = self._batch_v1.read_namespaced_job(name, namespace)
+            elif kind_lower == "cronjob":
+                resource = self._batch_v1.read_namespaced_cron_job(name, namespace)
+            elif kind_lower == "pod":
+                resource = self._core_v1.read_namespaced_pod(name, namespace)
+            elif kind_lower == "service":
+                resource = self._core_v1.read_namespaced_service(name, namespace)
+            elif kind_lower == "configmap":
+                resource = self._core_v1.read_namespaced_config_map(name, namespace)
+            elif kind_lower == "secret":
+                resource = self._core_v1.read_namespaced_secret(name, namespace)
+            elif kind_lower == "ingress":
+                resource = self._networking_v1.read_namespaced_ingress(name, namespace)
+            elif kind_lower == "persistentvolumeclaim" or kind_lower == "pvc":
+                resource = self._core_v1.read_namespaced_persistent_volume_claim(name, namespace)
+            elif kind_lower == "persistentvolume" or kind_lower == "pv":
+                resource = self._core_v1.read_persistent_volume(name)
+            elif kind_lower == "storageclass":
+                resource = self._storage_v1.read_storage_class(name)
+            elif kind_lower == "namespace":
+                resource = self._core_v1.read_namespace(name)
+            elif kind_lower == "horizontalpodautoscaler" or kind_lower == "hpa":
+                resource = self._autoscaling_v1.read_namespaced_horizontal_pod_autoscaler(name, namespace)
+            else:
+                return ResourceYAMLResponse(
+                    success=False,
+                    kind=kind,
+                    name=name,
+                    namespace=namespace,
+                    yaml_content="",
+                    error=f"Unsupported resource kind: {kind}"
+                )
+
+            if not resource:
+                return ResourceYAMLResponse(
+                    success=False,
+                    kind=kind,
+                    name=name,
+                    namespace=namespace,
+                    yaml_content="",
+                    error=f"Resource {kind}/{name} not found"
+                )
+
+            # Convert to dict and clean up (remove status, managed fields, etc.)
+            resource_dict = self._api_client.sanitize_for_serialization(resource)
+
+            # Remove unnecessary fields
+            if "status" in resource_dict:
+                del resource_dict["status"]
+            if "metadata" in resource_dict:
+                metadata = resource_dict["metadata"]
+                # Keep only essential metadata
+                essential_metadata = {
+                    "name": metadata.get("name"),
+                    "namespace": metadata.get("namespace"),
+                    "labels": metadata.get("labels", {}),
+                    "annotations": metadata.get("annotations", {})
+                }
+                resource_dict["metadata"] = essential_metadata
+
+            # Convert to YAML
+            yaml_content = yaml.dump(resource_dict, default_flow_style=False, sort_keys=False)
+
+            return ResourceYAMLResponse(
+                success=True,
+                kind=kind,
+                name=name,
+                namespace=namespace,
+                yaml_content=yaml_content
+            )
+
+        except ApiException as e:
+            logger.error(f"Error getting YAML for {kind}/{name}: {e}")
+            return ResourceYAMLResponse(
+                success=False,
+                kind=kind,
+                name=name,
+                namespace=namespace,
+                yaml_content="",
+                error=f"API error: {e.reason}"
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error getting YAML for {kind}/{name}: {e}")
+            return ResourceYAMLResponse(
+                success=False,
+                kind=kind,
+                name=name,
+                namespace=namespace,
+                yaml_content="",
+                error=str(e)
+            )
+
+    async def get_workload_events(self, kind: str, name: str, namespace: str) -> List[K8sEvent]:
+        """Get events for a specific workload (Deployment, StatefulSet, DaemonSet, Job)."""
+        self._initialize()
+        try:
+            # Use field selector to filter events for this specific workload
+            field_selector = f"involvedObject.name={name},involvedObject.kind={kind}"
+            events = self._core_v1.list_namespaced_event(namespace, field_selector=field_selector)
+
+            result = []
+            for event in events.items:
+                result.append(
+                    K8sEvent(
+                        name=event.metadata.name,
+                        namespace=event.metadata.namespace,
+                        type=event.type or "Normal",
+                        reason=event.reason or "",
+                        message=event.message or "",
+                        count=event.count or 1,
+                        first_timestamp=event.first_timestamp,
+                        last_timestamp=event.last_timestamp,
+                        involved_object={
+                            "kind": event.involved_object.kind,
+                            "name": event.involved_object.name,
+                            "namespace": event.involved_object.namespace or "",
+                        },
+                    )
+                )
+
+            # Sort by last timestamp (most recent first)
+            result.sort(key=lambda x: x.last_timestamp or x.first_timestamp or datetime.min, reverse=True)
+            return result
+
+        except ApiException as e:
+            logger.error(f"Error getting events for {kind}/{name}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error getting events for {kind}/{name}: {e}")
+            return []
 
 
 kubernetes_service = KubernetesService()

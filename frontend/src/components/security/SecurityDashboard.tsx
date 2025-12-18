@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheckIcon,
@@ -17,11 +17,19 @@ import {
   GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import api from '../../services/api';
+import { logger } from '../../utils/logger';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import GlassCard, { SectionHeader } from '../common/GlassCard';
-import { Spinner, ProgressBar, CircularProgress } from '../common/LoadingStates';
+import { Spinner, ProgressBar, CircularProgress, SecuritySkeleton, ConnectionError } from '../common/LoadingStates';
+import { useToast } from '../../contexts/ToastContext';
+import { useCluster } from '../../contexts/ClusterContext';
+import { useSecurityDashboard } from '../../hooks/useSecurityData';
+
+// Import shared constants
+import { containerVariants, itemVariants, scaleVariants, SEVERITY_CONFIG, getSeverityConfig } from '../../utils/constants';
+import { SeverityBadge } from '../common/StatusBadge';
 
 // Types and Interfaces
 interface SecurityScore {
@@ -237,30 +245,30 @@ interface AIRemediationResponse {
   note?: string;
 }
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
-
+// Modal variants (uses shared scaleVariants as base)
 const modalVariants = {
-  hidden: { opacity: 0, scale: 0.95 },
+  ...scaleVariants,
   visible: { opacity: 1, scale: 1, transition: { type: 'spring' as const, duration: 0.3 } },
-  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
 };
 
 export default function SecurityDashboard() {
-  const [loading, setLoading] = useState(true);
+  const toast = useToast();
+  const { activeCluster } = useCluster();
+
+  // Use cached hook for main security data - cluster-aware caching
+  const {
+    dashboard: data,
+    rbacSummary,
+    networkPolicySummary,
+    trendsSummary,
+    isLoading: loading,
+    isRefetching,
+    error: queryError,
+    refresh: refreshSecurityData,
+    hardReset,
+  } = useSecurityDashboard(activeCluster?.id);
+
   const [scanning, setScanning] = useState(false);
-  const [data, setData] = useState<SecurityDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedFinding, setSelectedFinding] = useState<SecurityFinding | null>(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -268,14 +276,9 @@ export default function SecurityDashboard() {
   const [showImageScans, setShowImageScans] = useState(false);
   const [loadingImages, setLoadingImages] = useState(false);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [showAllFindings, setShowAllFindings] = useState(false);
 
-  // New security features state
-  const [rbacSummary, setRbacSummary] = useState<RBACSummary | null>(null);
-  const [networkPolicySummary, setNetworkPolicySummary] = useState<NetworkPolicySummary | null>(null);
-  const [trendsSummary, setTrendsSummary] = useState<TrendsSummary | null>(null);
-  const [loadingRbac, setLoadingRbac] = useState(false);
-  const [loadingNetPol, setLoadingNetPol] = useState(false);
-  const [loadingTrends, setLoadingTrends] = useState(false);
+  // Loading states are now handled by the useSecurityDashboard hook (isRefetching)
 
   // Detailed data for modals
   const [rbacDetail, setRbacDetail] = useState<RBACAnalysisDetail | null>(null);
@@ -418,27 +421,13 @@ export default function SecurityDashboard() {
   };
 
   // API Functions
-  const fetchSecurityData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await api.get<SecurityDashboardData>('/security/dashboard');
-      setData(response.data);
-    } catch (err: any) {
-      console.error('Error fetching security data:', err);
-      setError(err.response?.data?.detail || 'Failed to fetch security data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const triggerScan = async () => {
     try {
       setScanning(true);
       await api.post('/security/scan');
-      await fetchSecurityData();
+      await refreshSecurityData();
     } catch (err: any) {
-      console.error('Error triggering scan:', err);
+      logger.error('Error triggering scan', err);
       setError(err.response?.data?.detail || 'Failed to trigger security scan');
     } finally {
       setScanning(false);
@@ -452,46 +441,10 @@ export default function SecurityDashboard() {
       setImageScans(response.data);
       setShowImageScans(true);
     } catch (err: any) {
-      console.error('Error fetching image scans:', err);
+      logger.error('Error fetching image scans', err);
       setError(err.response?.data?.detail || 'Failed to fetch image scans');
     } finally {
       setLoadingImages(false);
-    }
-  };
-
-  const fetchRbacSummary = async () => {
-    try {
-      setLoadingRbac(true);
-      const response = await api.get<RBACSummary>('/security/rbac/summary');
-      setRbacSummary(response.data);
-    } catch (err: any) {
-      console.error('Error fetching RBAC summary:', err);
-    } finally {
-      setLoadingRbac(false);
-    }
-  };
-
-  const fetchNetworkPolicySummary = async () => {
-    try {
-      setLoadingNetPol(true);
-      const response = await api.get<NetworkPolicySummary>('/security/network-policies/summary');
-      setNetworkPolicySummary(response.data);
-    } catch (err: any) {
-      console.error('Error fetching network policy summary:', err);
-    } finally {
-      setLoadingNetPol(false);
-    }
-  };
-
-  const fetchTrendsSummary = async () => {
-    try {
-      setLoadingTrends(true);
-      const response = await api.get<TrendsSummary>('/security/trends/summary');
-      setTrendsSummary(response.data);
-    } catch (err: any) {
-      console.error('Error fetching trends summary:', err);
-    } finally {
-      setLoadingTrends(false);
     }
   };
 
@@ -502,7 +455,7 @@ export default function SecurityDashboard() {
       setRbacDetail(response.data);
       setShowRbacModal(true);
     } catch (err: any) {
-      console.error('Error fetching RBAC details:', err);
+      logger.error('Error fetching RBAC details', err);
       setError(err.response?.data?.detail || 'Failed to fetch RBAC details');
     } finally {
       setLoadingRbacDetail(false);
@@ -516,7 +469,7 @@ export default function SecurityDashboard() {
       setNetworkPolicyDetail(response.data);
       setShowNetPolModal(true);
     } catch (err: any) {
-      console.error('Error fetching network policy details:', err);
+      logger.error('Error fetching network policy details', err);
       setError(err.response?.data?.detail || 'Failed to fetch network policy details');
     } finally {
       setLoadingNetPolDetail(false);
@@ -530,7 +483,7 @@ export default function SecurityDashboard() {
       setTrendsDetail(response.data);
       setShowTrendsModal(true);
     } catch (err: any) {
-      console.error('Error fetching trends details:', err);
+      logger.error('Error fetching trends details', err);
       setError(err.response?.data?.detail || 'Failed to fetch trends details');
     } finally {
       setLoadingTrendsDetail(false);
@@ -559,7 +512,7 @@ export default function SecurityDashboard() {
       });
       setAiRemediation(response.data);
     } catch (err: any) {
-      console.error('Error fetching AI remediation:', err);
+      logger.error('Error fetching AI remediation', err);
       setAiError(err.response?.data?.detail || 'Failed to get AI remediation advice');
     } finally {
       setLoadingAiRemediation(null);
@@ -588,7 +541,7 @@ export default function SecurityDashboard() {
       setAiRemediation(response.data);
       setShowAiModal(true);
     } catch (err: any) {
-      console.error('Error fetching AI remediation:', err);
+      logger.error('Error fetching AI remediation', err);
       setAiError(err.response?.data?.detail || 'Failed to get AI remediation advice');
     } finally {
       setLoadingAiRemediation(null);
@@ -617,7 +570,7 @@ export default function SecurityDashboard() {
       setAiRemediation(response.data);
       setShowAiModal(true);
     } catch (err: any) {
-      console.error('Error fetching AI remediation:', err);
+      logger.error('Error fetching AI remediation', err);
       setAiError(err.response?.data?.detail || 'Failed to get AI remediation advice');
     } finally {
       setLoadingAiRemediation(null);
@@ -646,7 +599,7 @@ export default function SecurityDashboard() {
       setAiRemediation(response.data);
       setShowAiModal(true);
     } catch (err: any) {
-      console.error('Error fetching AI remediation:', err);
+      logger.error('Error fetching AI remediation', err);
       setAiError(err.response?.data?.detail || 'Failed to get AI remediation advice');
     } finally {
       setLoadingAiRemediation(null);
@@ -675,19 +628,12 @@ export default function SecurityDashboard() {
       setAiRemediation(response.data);
       setShowAiModal(true);
     } catch (err: any) {
-      console.error('Error fetching AI remediation:', err);
+      logger.error('Error fetching AI remediation', err);
       setAiError(err.response?.data?.detail || 'Failed to get AI remediation advice');
     } finally {
       setLoadingAiRemediation(null);
     }
   };
-
-  useEffect(() => {
-    fetchSecurityData();
-    fetchRbacSummary();
-    fetchNetworkPolicySummary();
-    fetchTrendsSummary();
-  }, []);
 
   // Helper functions
   const getGradeColor = (grade: string) => {
@@ -717,6 +663,46 @@ export default function SecurityDashboard() {
     }
   };
 
+  // Generate plain English explanations for security findings
+  const getPlainEnglishExplanation = (finding: SecurityFinding) => {
+    const typeExplanations: Record<string, { explanation: string; businessImpact: string; complianceRisk: string }> = {
+      'vulnerability': {
+        explanation: `This container image has a known security vulnerability (${finding.cve_id || 'CVE'}). Think of it like running software with a known bug that hackers can exploit to break into your system.`,
+        businessImpact: 'Attackers could use this vulnerability to steal data, disrupt services, or gain unauthorized access to your applications.',
+        complianceRisk: 'May violate PCI-DSS, SOC 2, HIPAA, and ISO 27001 requirements for vulnerability management.'
+      },
+      'misconfiguration': {
+        explanation: 'This resource is configured in a way that creates security risks. It\'s like leaving a door unlocked or a window open in your house.',
+        businessImpact: 'Increases the attack surface and makes it easier for malicious actors to compromise your infrastructure.',
+        complianceRisk: 'May violate CIS Kubernetes Benchmarks and security configuration standards required by major compliance frameworks.'
+      },
+      'rbac': {
+        explanation: 'This resource has excessive permissions that violate the principle of least privilege. It\'s like giving a janitor the master key to every office.',
+        businessImpact: 'If compromised, attackers could gain elevated privileges and access sensitive resources they shouldn\'t have access to.',
+        complianceRisk: 'Violates SOC 2, ISO 27001, and PCI-DSS requirements for access control and least privilege.'
+      },
+      'network_policy': {
+        explanation: 'This workload lacks proper network segmentation. It\'s like having no doors or walls between rooms in a building.',
+        businessImpact: 'Attackers who compromise one component can easily move laterally to access other services and data.',
+        complianceRisk: 'May violate PCI-DSS network segmentation requirements and zero-trust architecture principles.'
+      },
+      'secrets': {
+        explanation: 'Sensitive information (passwords, API keys, tokens) is exposed or improperly stored. It\'s like writing your password on a sticky note.',
+        businessImpact: 'Exposed credentials can lead to data breaches, unauthorized access, and complete system compromise.',
+        complianceRisk: 'Critical violation of SOC 2, HIPAA, PCI-DSS, and GDPR requirements for secrets management.'
+      },
+      'default': {
+        explanation: 'This security issue could put your cluster and applications at risk. It represents a gap between your current configuration and security best practices.',
+        businessImpact: 'May allow unauthorized access, data breaches, or service disruptions if exploited by malicious actors.',
+        complianceRisk: 'Could violate security requirements in major compliance frameworks including SOC 2, ISO 27001, and industry-specific regulations.'
+      }
+    };
+
+    const findingType = finding.type.toLowerCase();
+    const matchedType = Object.keys(typeExplanations).find(key => findingType.includes(key));
+    return typeExplanations[matchedType || 'default'];
+  };
+
   const getRiskBadgeColor = (level: string) => {
     switch (level.toLowerCase()) {
       case 'critical': return 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400';
@@ -726,32 +712,60 @@ export default function SecurityDashboard() {
     }
   };
 
+  // Debug logging - check console if page is blank
+  logger.debug('[SecurityDashboard] Render state', {
+    loading,
+    isRefetching,
+    queryError: queryError ? String(queryError) : null,
+    hasData: !!data,
+    dataContent: data,
+  });
+
   // Loading State
   if (loading) {
+    logger.debug('[SecurityDashboard] Showing loading skeleton');
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Spinner size="lg" />
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading security data...</p>
-        </div>
+      <div className="p-6">
+        <SecuritySkeleton />
       </div>
     );
   }
 
-  // Error State
-  if (error || !data) {
+  // Error State - check for query error or missing/incomplete dashboard data
+  const hasValidData = data && data.security_score && data.vulnerability_summary;
+  if (queryError || !hasValidData) {
+    logger.debug('[SecurityDashboard] Showing error state - data invalid or error');
     return (
-      <GlassCard className="border-danger-500/30">
-        <div className="flex items-center gap-3 text-danger-600 dark:text-danger-400">
-          <XCircleIcon className="h-6 w-6" />
-          <span className="font-medium">{error || 'Failed to load security data'}</span>
-        </div>
-      </GlassCard>
+      <div className="p-6">
+        <ConnectionError
+          service="Security API"
+          onRetry={refreshSecurityData}
+          retrying={loading || isRefetching}
+        />
+      </div>
     );
   }
 
-  const { security_score, vulnerability_summary, top_findings, compliance_summary, risky_namespaces } = data;
+  // Safely destructure with defaults to prevent crashes
+  const {
+    security_score = { score: 0, grade: 'N/A', total_findings: 0, critical_issues: 0, high_issues: 0, medium_issues: 0, low_issues: 0, last_scan: '' },
+    vulnerability_summary = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0, total: 0 },
+    top_findings = [],
+    compliance_summary = { passed: 0, failed: 0, total: 0 },
+    risky_namespaces = []
+  } = data;
   const complianceRate = compliance_summary.total > 0 ? Math.round((compliance_summary.passed / compliance_summary.total) * 100) : 0;
+
+  // Filter and sort findings to show TOP 3 critical/high risks by default
+  const sortedFindings = [...top_findings].sort((a, b) => {
+    const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    return (severityOrder[a.severity.toLowerCase() as keyof typeof severityOrder] || 99) -
+           (severityOrder[b.severity.toLowerCase() as keyof typeof severityOrder] || 99);
+  });
+
+  // Show only top 3 critical/high findings unless "View All" is clicked
+  const displayedFindings = showAllFindings ? sortedFindings : sortedFindings.slice(0, 3);
+  const hasMoreFindings = sortedFindings.length > 3;
 
   return (
     <motion.div
@@ -760,36 +774,45 @@ export default function SecurityDashboard() {
       animate="visible"
       className="space-y-6"
     >
-      {/* Header */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-            Security Posture Dashboard
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Real-time security analysis of your Kubernetes cluster
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowHelp(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-gray-200/50 dark:border-slate-700/50 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm"
-          >
-            <InformationCircleIcon className="h-5 w-5" />
-            Help
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={triggerScan}
-            disabled={scanning}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all shadow-lg shadow-primary-500/25"
-          >
-            <ArrowPathIcon className={`h-5 w-5 ${scanning ? 'animate-spin' : ''}`} />
-            {scanning ? 'Scanning...' : 'Run New Scan'}
-          </motion.button>
+      {/* Sticky Header */}
+      <motion.div
+        variants={itemVariants}
+        className="sticky top-16 z-30 -mx-4 lg:-mx-8 px-4 lg:px-8 py-4 bg-gray-50/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-gray-200/50 dark:border-slate-700/50"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary-100 dark:bg-primary-900/30">
+              <ShieldCheckIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+                Security
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                Cluster security analysis and compliance
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowHelp(true)}
+              className="p-2.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <InformationCircleIcon className="h-5 w-5" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={triggerScan}
+              disabled={scanning}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 disabled:opacity-50 transition-all duration-300"
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${scanning ? 'animate-spin' : ''}`} />
+              {scanning ? 'Scanning...' : 'Scan Now'}
+            </motion.button>
+          </div>
         </div>
       </motion.div>
 
@@ -1013,13 +1036,11 @@ export default function SecurityDashboard() {
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-white">RBAC Analysis</h3>
             </div>
-            <button onClick={fetchRbacSummary} disabled={loadingRbac} className="text-gray-400 hover:text-gray-600">
-              <ArrowPathIcon className={`h-4 w-4 ${loadingRbac ? 'animate-spin' : ''}`} />
+            <button onClick={refreshSecurityData} disabled={isRefetching} className="text-gray-400 hover:text-gray-600">
+              <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          {loadingRbac ? (
-            <div className="flex justify-center py-8"><Spinner /></div>
-          ) : rbacSummary ? (
+          {rbacSummary ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Risk Level</span>
@@ -1069,13 +1090,11 @@ export default function SecurityDashboard() {
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-white">Network Policies</h3>
             </div>
-            <button onClick={fetchNetworkPolicySummary} disabled={loadingNetPol} className="text-gray-400 hover:text-gray-600">
-              <ArrowPathIcon className={`h-4 w-4 ${loadingNetPol ? 'animate-spin' : ''}`} />
+            <button onClick={refreshSecurityData} disabled={isRefetching} className="text-gray-400 hover:text-gray-600">
+              <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          {loadingNetPol ? (
-            <div className="flex justify-center py-8"><Spinner /></div>
-          ) : networkPolicySummary ? (
+          {networkPolicySummary ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Coverage</span>
@@ -1128,13 +1147,11 @@ export default function SecurityDashboard() {
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-white">Security Trends</h3>
             </div>
-            <button onClick={fetchTrendsSummary} disabled={loadingTrends} className="text-gray-400 hover:text-gray-600">
-              <ArrowPathIcon className={`h-4 w-4 ${loadingTrends ? 'animate-spin' : ''}`} />
+            <button onClick={refreshSecurityData} disabled={isRefetching} className="text-gray-400 hover:text-gray-600">
+              <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          {loadingTrends ? (
-            <div className="flex justify-center py-8"><Spinner /></div>
-          ) : trendsSummary ? (
+          {trendsSummary ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Trend</span>
@@ -1189,14 +1206,28 @@ export default function SecurityDashboard() {
       <motion.div variants={itemVariants}>
         <GlassCard padding="none">
           <div className="p-4 lg:p-6 border-b border-gray-100/50 dark:border-slate-700/50">
-            <SectionHeader
-              title="Top Security Findings"
-              subtitle="Most critical security issues requiring immediate attention"
-            />
+            <div className="flex items-center justify-between">
+              <SectionHeader
+                title={showAllFindings ? "All Security Findings" : "Top 3 Security Risks"}
+                subtitle={showAllFindings
+                  ? "All security issues sorted by severity"
+                  : "Most critical security issues requiring immediate attention"}
+              />
+              {hasMoreFindings && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowAllFindings(!showAllFindings)}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 transition-all shadow-sm"
+                >
+                  {showAllFindings ? 'Show Top 3' : `View All (${sortedFindings.length})`}
+                </motion.button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-gray-100/50 dark:divide-slate-700/50">
-            {top_findings.length > 0 ? (
-              top_findings.map((finding, index) => (
+            {displayedFindings.length > 0 ? (
+              displayedFindings.map((finding, index) => (
                 <motion.div
                   key={finding.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -1280,8 +1311,44 @@ export default function SecurityDashboard() {
                 </div>
 
                 <div className="space-y-4">
+                  {/* Plain English Explanation */}
+                  {(() => {
+                    const plainEnglish = getPlainEnglishExplanation(selectedFinding);
+                    return (
+                      <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-200 dark:border-blue-500/20">
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-500/20">
+                            <InformationCircleIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                              💡 What does this mean?
+                            </h4>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                              {plainEnglish.explanation}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2 mt-3 pt-3 border-t border-blue-200 dark:border-blue-500/20">
+                          <div>
+                            <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">📊 Business Impact:</p>
+                            <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                              {plainEnglish.businessImpact}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">📋 Compliance Risk:</p>
+                            <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                              {plainEnglish.complianceRisk}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Description</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Technical Details</h4>
                     <p className="text-gray-600 dark:text-gray-400">{selectedFinding.description}</p>
                   </div>
 

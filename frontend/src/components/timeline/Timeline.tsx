@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { logger } from '../../utils/logger';
 import {
   ClockIcon,
   RocketLaunchIcon,
@@ -61,7 +62,7 @@ export default function Timeline() {
       setEvents(eventsRes.data);
       setStats(statsRes.data);
     } catch (error) {
-      console.error('Failed to fetch timeline:', error);
+      logger.error('Failed to fetch timeline', error);
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -11,6 +14,8 @@ import {
   ArrowPathIcon,
   MinusIcon,
   ArrowsPointingOutIcon,
+  ClipboardIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline';
 
 interface Message {
@@ -30,14 +35,58 @@ const quickActions = [
   { icon: CommandLineIcon, label: 'Deploys', prompt: 'What is the status of recent deployments?' },
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
+
+// Code block component with copy functionality
+function CodeBlock({ code, language, isDark }: { code: string; language: string; isDark: boolean }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group my-2">
+      <button
+        onClick={handleCopy}
+        className="absolute right-2 top-2 p-1.5 rounded-md bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        title="Copy code"
+      >
+        {copied ? (
+          <CheckIcon className="h-3.5 w-3.5 text-success-400" />
+        ) : (
+          <ClipboardIcon className="h-3.5 w-3.5" />
+        )}
+      </button>
+      <SyntaxHighlighter
+        language={language || 'text'}
+        style={isDark ? vscDarkPlus : vs}
+        customStyle={{
+          margin: 0,
+          borderRadius: '0.5rem',
+          fontSize: '0.7rem',
+          padding: '0.75rem',
+          maxHeight: '300px',
+        }}
+        wrapLongLines
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
 
 export default function AIChatPanel({ onClose }: AIChatPanelProps) {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return document.documentElement.classList.contains('dark') || window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: 'Hi! I\'m your NexOps AI assistant. How can I help you today?',
+      content: 'Hi! I\'m your NextSight AI assistant. How can I help you today?',
       timestamp: new Date(),
     },
   ]);
@@ -60,6 +109,16 @@ export default function AIChatPanel({ onClose }: AIChatPanelProps) {
     inputRef.current?.focus();
     // Check AI health on mount
     checkAIHealth();
+    // Detect dark mode
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeMediaQuery.matches || document.documentElement.classList.contains('dark'));
+
+    const handleDarkModeChange = (e: MediaQueryListEvent) => {
+      setIsDarkMode(e.matches || document.documentElement.classList.contains('dark'));
+    };
+
+    darkModeMediaQuery.addEventListener('change', handleDarkModeChange);
+    return () => darkModeMediaQuery.removeEventListener('change', handleDarkModeChange);
   }, []);
 
   const checkAIHealth = async () => {
@@ -144,7 +203,7 @@ export default function AIChatPanel({ onClose }: AIChatPanelProps) {
           <div className="p-1.5 rounded-lg bg-gradient-to-br from-primary-500 to-purple-500">
             <SparklesIcon className="h-4 w-4 text-white" />
           </div>
-          <span className="text-sm font-medium text-gray-900 dark:text-white">NexOps AI</span>
+          <span className="text-sm font-medium text-gray-900 dark:text-white">NextSight AI</span>
           <ArrowsPointingOutIcon className="h-4 w-4 text-gray-400" />
         </motion.button>
       </motion.div>
@@ -167,7 +226,7 @@ export default function AIChatPanel({ onClose }: AIChatPanelProps) {
               <SparklesIcon className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">NexOps AI</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">NextSight AI</h3>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${aiAvailable ? 'bg-success-500' : aiAvailable === false ? 'bg-danger-500' : 'bg-gray-400'}`} />
                 {aiAvailable ? 'Online' : aiAvailable === false ? 'Offline' : 'Checking...'}
@@ -212,7 +271,53 @@ export default function AIChatPanel({ onClose }: AIChatPanelProps) {
                       : 'bg-gray-100/80 dark:bg-slate-700/80 text-gray-900 dark:text-gray-100'
                   }`}
                 >
-                  <p className="text-xs whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  {message.role === 'user' ? (
+                    <p className="text-xs whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  ) : (
+                    <div className="text-xs leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-headings:text-xs prose-headings:font-semibold prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-code:text-[10px] prose-code:bg-gray-200/50 dark:prose-code:bg-slate-600/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:my-2 prose-pre:p-0 prose-strong:font-semibold">
+                      <ReactMarkdown
+                        components={{
+                          code({ className, children, ...props }: any) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            const codeString = String(children).replace(/\n$/, '');
+                            const isInline = !className || className === '';
+
+                            return !isInline && match ? (
+                              <CodeBlock
+                                code={codeString}
+                                language={match[1]}
+                                isDark={isDarkMode}
+                              />
+                            ) : (
+                              <code className={className} {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          h1: ({ children }) => <h1 className="text-xs font-bold mt-2 mb-1">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-xs font-semibold mt-2 mb-1">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-[11px] font-semibold mt-1.5 mb-0.5">{children}</h3>,
+                          p: ({ children }) => <p className="my-1 text-xs">{children}</p>,
+                          ul: ({ children }) => <ul className="my-1 ml-3 list-disc text-xs space-y-0.5">{children}</ul>,
+                          ol: ({ children }) => <ol className="my-1 ml-3 list-decimal text-xs space-y-0.5">{children}</ol>,
+                          li: ({ children }) => <li className="text-xs">{children}</li>,
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          a: ({ children, href }) => (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary-500 hover:text-primary-600 underline"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                   <p className={`text-[9px] mt-1 ${message.role === 'user' ? 'text-primary-200' : 'text-gray-400 dark:text-gray-500'}`}>
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>

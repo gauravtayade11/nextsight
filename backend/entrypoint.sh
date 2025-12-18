@@ -7,8 +7,10 @@ if [ -n "$K8S_HOST_OVERRIDE" ] && [ -n "$K8S_CONFIG_PATH" ] && [ -f "$K8S_CONFIG
     MODIFIED_CONFIG="/tmp/kubeconfig"
 
     # Copy and modify the kubeconfig, replacing localhost/127.0.0.1 with the override
+    # Also add insecure-skip-tls-verify for Docker Desktop development
     sed -e "s|server: https://127.0.0.1:|server: https://${K8S_HOST_OVERRIDE}:|g" \
         -e "s|server: https://localhost:|server: https://${K8S_HOST_OVERRIDE}:|g" \
+        -e "s|certificate-authority-data:|insecure-skip-tls-verify: true\n    certificate-authority-data:|g" \
         "$K8S_CONFIG_PATH" > "$MODIFIED_CONFIG"
 
     # Export the modified kubeconfig path for kubectl

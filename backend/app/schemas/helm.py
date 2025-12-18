@@ -91,6 +91,7 @@ class InstallRequest(BaseModel):
     timeout: int = 300  # seconds
     dry_run: bool = False
     repository: Optional[str] = None
+    skip_crds: bool = False  # Skip CRD installation if they already exist
 
 
 class UpgradeRequest(BaseModel):

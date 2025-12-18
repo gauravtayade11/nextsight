@@ -1,4 +1,4 @@
-# NexOps v1.2.0 - Feature Implementation Plan
+# NextSight v1.2.0 - Feature Implementation Plan
 
 ## Overview
 

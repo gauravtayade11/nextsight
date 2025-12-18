@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: nexops
+  name: nextsight
   labels:
-    app.kubernetes.io/name: nexops
-    app.kubernetes.io/part-of: nexops
+    app.kubernetes.io/name: nextsight
+    app.kubernetes.io/part-of: nextsight

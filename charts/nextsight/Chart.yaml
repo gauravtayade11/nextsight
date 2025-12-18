@@ -1,0 +1,19 @@
+apiVersion: v2
+name: nextsight
+description: A Helm chart for NextSight AI - See your DevOps world in one intelligent view
+type: application
+version: 1.4.0
+appVersion: "1.4.0"
+keywords:
+  - kubernetes
+  - dashboard
+  - devops
+  - monitoring
+  - security
+home: https://github.com/gauravtayade11/nextsight
+sources:
+  - https://github.com/gauravtayade11/nextsight
+maintainers:
+  - name: Gaurav Tayade
+    url: https://github.com/gauravtayade11
+icon: https://raw.githubusercontent.com/gauravtayade11/nextsight/main/docs/images/logo.png

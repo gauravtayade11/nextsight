@@ -1,6 +1,6 @@
-# Contributing to NexOps
+# Contributing to NextSight
 
-Thank you for your interest in contributing to NexOps! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to NextSight! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
@@ -50,7 +50,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 ```bash
 # Clone the repository
 git clone https://github.com/gauravtayade11/nexops.git
-cd NexOps
+cd NextSight
 
 # Using Docker Compose (recommended)
 make dev
@@ -95,7 +95,7 @@ npm run dev
 ## Project Structure
 
 ```
-NexOps/
+NextSight/
 ├── backend/           # FastAPI backend
 │   ├── app/
 │   │   ├── api/       # API routes

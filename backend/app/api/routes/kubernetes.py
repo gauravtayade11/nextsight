@@ -6,17 +6,24 @@ from app.schemas.gitflow import DeploymentRequest, DeploymentStatus, Environment
 from app.schemas.kubernetes import (
     ClusterMetrics,
     ConfigMapInfo,
+    ConfigMapDetail,
+    ConfigMapCreateRequest,
+    ConfigMapUpdateRequest,
     CronJobInfo,
     DaemonSetInfo,
     DeploymentInfo,
     HPAInfo,
     IngressInfo,
+    IngressCreateRequest,
+    IngressUpdateRequest,
     JobInfo,
     K8sClusterHealth,
     K8sEvent,
     KubectlRequest,
     KubectlResponse,
     NamespaceInfo,
+    NamespaceDetail,
+    NamespaceCreateRequest,
     NodeInfo,
     NodeMetrics,
     PodExecRequest,
@@ -25,13 +32,27 @@ from app.schemas.kubernetes import (
     PodLogResponse,
     PodMetrics,
     PVCInfo,
+    PVCCreateRequest,
+    PVCUpdateRequest,
+    PVInfo,
+    PVCreateRequest,
+    ResourceDeleteResponse,
+    ResourceYAMLRequest,
+    ResourceYAMLResponse,
     RestartRequest,
     ScaleRequest,
     SecretInfo,
+    SecretDetail,
+    SecretCreateRequest,
+    SecretUpdateRequest,
     ServiceInfo,
+    ServiceCreateRequest,
+    ServiceUpdateRequest,
     ShellRequest,
     ShellResponse,
     StatefulSetInfo,
+    StorageClassInfo,
+    StorageClassCreateRequest,
     YAMLApplyRequest,
     YAMLApplyResponse,
 )
@@ -48,6 +69,7 @@ async def get_cluster_health():
         return await kubernetes_service.get_cluster_health()
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Failed to get cluster health: {str(e)}")
+    return await kubernetes_service.get_cluster_health()
 
 
 @router.get("/namespaces", response_model=List[NamespaceInfo])
@@ -59,6 +81,34 @@ async def list_namespaces():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/namespaces/details", response_model=List[NamespaceDetail])
+async def list_namespaces_with_details():
+    """List all namespaces with resource counts (pods, deployments, services, etc.)."""
+    try:
+        return await kubernetes_service.get_namespaces_with_details()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/namespaces", response_model=NamespaceInfo)
+async def create_namespace(request: NamespaceCreateRequest):
+    """Create a new namespace."""
+    try:
+        return await kubernetes_service.create_namespace(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/namespaces/{name}")
+async def delete_namespace(name: str):
+    """Delete a namespace."""
+    try:
+        await kubernetes_service.delete_namespace(name)
+        return {"message": f"Namespace {name} deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/pods", response_model=List[PodInfo])
 async def list_pods(namespace: Optional[str] = Query(None)):
     """List pods, optionally filtered by namespace."""
@@ -66,6 +116,7 @@ async def list_pods(namespace: Optional[str] = Query(None)):
         return await kubernetes_service.get_pods(namespace)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    return await kubernetes_service.get_pods(namespace)
 
 
 @router.get("/deployments", response_model=List[DeploymentInfo])
@@ -77,11 +128,61 @@ async def list_deployments(namespace: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/deployments/{namespace}/{name}", response_model=DeploymentInfo)
+async def get_deployment(namespace: str, name: str):
+    """Get a specific deployment."""
+    try:
+        deployment = await kubernetes_service.get_deployment(namespace, name)
+        if not deployment:
+            raise HTTPException(status_code=404, detail=f"Deployment {namespace}/{name} not found")
+        return deployment
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/deployments/{namespace}/{name}", response_model=ResourceDeleteResponse)
+async def delete_deployment(namespace: str, name: str):
+    """Delete a deployment."""
+    try:
+        return await kubernetes_service.delete_deployment(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/services", response_model=List[ServiceInfo])
 async def list_services(namespace: Optional[str] = Query(None)):
     """List services, optionally filtered by namespace."""
     try:
         return await kubernetes_service.get_services(namespace)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/services", response_model=ServiceInfo)
+async def create_service(request: ServiceCreateRequest):
+    """Create a new Kubernetes Service."""
+    try:
+        return await kubernetes_service.create_service(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/services/{namespace}/{name}", response_model=ServiceInfo)
+async def update_service(namespace: str, name: str, request: ServiceUpdateRequest):
+    """Update an existing Kubernetes Service."""
+    try:
+        return await kubernetes_service.update_service(namespace, name, request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/services/{namespace}/{name}", response_model=ResourceDeleteResponse)
+async def delete_service(namespace: str, name: str):
+    """Delete a Kubernetes Service."""
+    try:
+        return await kubernetes_service.delete_service(namespace, name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -100,6 +201,15 @@ async def get_pod_events(namespace: str, pod_name: str):
     """Get events for a specific pod."""
     try:
         return await kubernetes_service.get_pod_events(namespace, pod_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/workloads/{kind}/{namespace}/{name}/events", response_model=List[K8sEvent])
+async def get_workload_events(kind: str, namespace: str, name: str):
+    """Get events for a specific workload (Deployment, StatefulSet, DaemonSet, Job)."""
+    try:
+        return await kubernetes_service.get_workload_events(kind, namespace, name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -201,7 +311,34 @@ async def get_node(node_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/nodes/{node_name}/pods", response_model=List[PodInfo])
+async def get_pods_on_node(node_name: str):
+    """Get all pods running on a specific node."""
+    try:
+        return await kubernetes_service.get_pods_on_node(node_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Metrics endpoints
+@router.get("/metrics/status")
+async def get_metrics_server_status():
+    """Check if metrics-server is available in the cluster."""
+    try:
+        metrics = await kubernetes_service.get_node_metrics()
+        return {
+            "available": len(metrics) > 0,
+            "message": "Metrics server is available" if metrics else "Metrics server not found",
+            "node_count": len(metrics)
+        }
+    except Exception:
+        return {
+            "available": False,
+            "message": "Metrics server not available or not installed",
+            "node_count": 0
+        }
+
+
 @router.get("/metrics", response_model=ClusterMetrics)
 async def get_cluster_metrics():
     """Get cluster-wide resource metrics (requires metrics-server)."""
@@ -288,12 +425,76 @@ async def list_ingresses(namespace: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/ingresses", response_model=IngressInfo)
+async def create_ingress(request: IngressCreateRequest):
+    """Create a new Kubernetes Ingress."""
+    try:
+        return await kubernetes_service.create_ingress(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/ingresses/{namespace}/{name}", response_model=IngressInfo)
+async def update_ingress(namespace: str, name: str, request: IngressUpdateRequest):
+    """Update an existing Kubernetes Ingress."""
+    try:
+        return await kubernetes_service.update_ingress(namespace, name, request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/ingresses/{namespace}/{name}", response_model=ResourceDeleteResponse)
+async def delete_ingress(namespace: str, name: str):
+    """Delete a Kubernetes Ingress."""
+    try:
+        return await kubernetes_service.delete_ingress(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ConfigMap endpoints
 @router.get("/configmaps", response_model=List[ConfigMapInfo])
 async def list_configmaps(namespace: Optional[str] = Query(None)):
     """List ConfigMaps, optionally filtered by namespace."""
     try:
         return await kubernetes_service.get_configmaps(namespace)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/configmaps/{namespace}/{name}", response_model=ConfigMapDetail)
+async def get_configmap(namespace: str, name: str):
+    """Get a single ConfigMap with full data values."""
+    try:
+        return await kubernetes_service.get_configmap(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/configmaps", response_model=ConfigMapDetail)
+async def create_configmap(request: ConfigMapCreateRequest):
+    """Create a new ConfigMap."""
+    try:
+        return await kubernetes_service.create_configmap(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/configmaps/{namespace}/{name}", response_model=ConfigMapDetail)
+async def update_configmap(namespace: str, name: str, request: ConfigMapUpdateRequest):
+    """Update an existing ConfigMap."""
+    try:
+        return await kubernetes_service.update_configmap(namespace, name, request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/configmaps/{namespace}/{name}")
+async def delete_configmap(namespace: str, name: str):
+    """Delete a ConfigMap."""
+    try:
+        await kubernetes_service.delete_configmap(namespace, name)
+        return {"message": f"ConfigMap {namespace}/{name} deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -308,12 +509,132 @@ async def list_secrets(namespace: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/secrets/{namespace}/{name}", response_model=SecretDetail)
+async def get_secret(namespace: str, name: str):
+    """Get a single secret with decoded data values."""
+    try:
+        return await kubernetes_service.get_secret(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/secrets", response_model=SecretDetail)
+async def create_secret(request: SecretCreateRequest):
+    """Create a new secret."""
+    try:
+        return await kubernetes_service.create_secret(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/secrets/{namespace}/{name}", response_model=SecretDetail)
+async def update_secret(namespace: str, name: str, request: SecretUpdateRequest):
+    """Update an existing secret."""
+    try:
+        return await kubernetes_service.update_secret(namespace, name, request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/secrets/{namespace}/{name}")
+async def delete_secret(namespace: str, name: str):
+    """Delete a secret."""
+    try:
+        await kubernetes_service.delete_secret(namespace, name)
+        return {"message": f"Secret {namespace}/{name} deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # PVC endpoints
 @router.get("/pvcs", response_model=List[PVCInfo])
 async def list_pvcs(namespace: Optional[str] = Query(None)):
     """List PersistentVolumeClaims, optionally filtered by namespace."""
     try:
         return await kubernetes_service.get_pvcs(namespace)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pvcs", response_model=PVCInfo)
+async def create_pvc(request: PVCCreateRequest):
+    """Create a new PersistentVolumeClaim."""
+    try:
+        return await kubernetes_service.create_pvc(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/pvcs/{namespace}/{name}", response_model=PVCInfo)
+async def update_pvc(namespace: str, name: str, request: PVCUpdateRequest):
+    """Update a PersistentVolumeClaim (e.g., storage expansion)."""
+    try:
+        return await kubernetes_service.update_pvc(namespace, name, request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/pvcs/{namespace}/{name}", response_model=ResourceDeleteResponse)
+async def delete_pvc(namespace: str, name: str):
+    """Delete a PersistentVolumeClaim."""
+    try:
+        return await kubernetes_service.delete_pvc(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# PV endpoints
+@router.get("/pvs", response_model=List[PVInfo])
+async def list_pvs():
+    """List PersistentVolumes."""
+    try:
+        return await kubernetes_service.get_pvs()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pvs", response_model=PVInfo)
+async def create_pv(request: PVCreateRequest):
+    """Create a new PersistentVolume."""
+    try:
+        return await kubernetes_service.create_pv(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/pvs/{name}", response_model=ResourceDeleteResponse)
+async def delete_pv(name: str):
+    """Delete a PersistentVolume."""
+    try:
+        return await kubernetes_service.delete_pv(name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# StorageClass endpoints
+@router.get("/storageclasses", response_model=List[StorageClassInfo])
+async def list_storage_classes():
+    """List StorageClasses."""
+    try:
+        return await kubernetes_service.get_storage_classes()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/storageclasses", response_model=StorageClassInfo)
+async def create_storage_class(request: StorageClassCreateRequest):
+    """Create a new StorageClass."""
+    try:
+        return await kubernetes_service.create_storage_class(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/storageclasses/{name}", response_model=ResourceDeleteResponse)
+async def delete_storage_class(name: str):
+    """Delete a StorageClass."""
+    try:
+        return await kubernetes_service.delete_storage_class(name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -328,6 +649,47 @@ async def list_statefulsets(namespace: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/statefulsets/{namespace}/{name}", response_model=StatefulSetInfo)
+async def get_statefulset(namespace: str, name: str):
+    """Get a specific StatefulSet."""
+    try:
+        statefulset = await kubernetes_service.get_statefulset(namespace, name)
+        if not statefulset:
+            raise HTTPException(status_code=404, detail=f"StatefulSet {namespace}/{name} not found")
+        return statefulset
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/statefulsets/{namespace}/{name}", response_model=ResourceDeleteResponse)
+async def delete_statefulset(namespace: str, name: str):
+    """Delete a StatefulSet."""
+    try:
+        return await kubernetes_service.delete_statefulset(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/statefulsets/{namespace}/{name}/scale")
+async def scale_statefulset(namespace: str, name: str, replicas: int = Query(..., ge=0)):
+    """Scale a StatefulSet to the specified number of replicas."""
+    try:
+        return await kubernetes_service.scale_statefulset(namespace, name, replicas)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/statefulsets/{namespace}/{name}/restart")
+async def restart_statefulset(namespace: str, name: str):
+    """Restart a StatefulSet by updating its pod template."""
+    try:
+        return await kubernetes_service.restart_statefulset(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # DaemonSet endpoints
 @router.get("/daemonsets", response_model=List[DaemonSetInfo])
 async def list_daemonsets(namespace: Optional[str] = Query(None)):
@@ -338,12 +700,67 @@ async def list_daemonsets(namespace: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/daemonsets/{namespace}/{name}", response_model=DaemonSetInfo)
+async def get_daemonset(namespace: str, name: str):
+    """Get a specific DaemonSet."""
+    try:
+        daemonset = await kubernetes_service.get_daemonset(namespace, name)
+        if not daemonset:
+            raise HTTPException(status_code=404, detail=f"DaemonSet {namespace}/{name} not found")
+        return daemonset
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/daemonsets/{namespace}/{name}", response_model=ResourceDeleteResponse)
+async def delete_daemonset(namespace: str, name: str):
+    """Delete a DaemonSet."""
+    try:
+        return await kubernetes_service.delete_daemonset(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/daemonsets/{namespace}/{name}/restart")
+async def restart_daemonset(namespace: str, name: str):
+    """Restart a DaemonSet by updating its pod template."""
+    try:
+        return await kubernetes_service.restart_daemonset(namespace, name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Job endpoints
 @router.get("/jobs", response_model=List[JobInfo])
 async def list_jobs(namespace: Optional[str] = Query(None)):
     """List Jobs, optionally filtered by namespace."""
     try:
         return await kubernetes_service.get_jobs(namespace)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/jobs/{namespace}/{name}", response_model=JobInfo)
+async def get_job(namespace: str, name: str):
+    """Get a specific Job."""
+    try:
+        job = await kubernetes_service.get_job(namespace, name)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {namespace}/{name} not found")
+        return job
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/jobs/{namespace}/{name}", response_model=ResourceDeleteResponse)
+async def delete_job(namespace: str, name: str):
+    """Delete a Job."""
+    try:
+        return await kubernetes_service.delete_job(namespace, name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -428,5 +845,32 @@ async def rollback_deployment_to_revision(
         return result
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Resource YAML endpoints
+@router.post("/resource/yaml", response_model=ResourceYAMLResponse)
+async def get_resource_yaml(request: ResourceYAMLRequest):
+    """Get the YAML definition of any Kubernetes resource."""
+    try:
+        return await kubernetes_service.get_resource_yaml(
+            kind=request.kind,
+            name=request.name,
+            namespace=request.namespace
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/resource/yaml")
+async def update_resource_yaml(request: YAMLApplyRequest):
+    """Update a Kubernetes resource by applying YAML."""
+    try:
+        return await kubernetes_service.apply_yaml(
+            yaml_content=request.yaml_content,
+            namespace=request.namespace,
+            dry_run=request.dry_run
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -45,6 +45,8 @@ htmlcov/
 .tox/
 coverage.xml
 *.cover
+bandit-report.json
+security-report.json
 
 # Build
 *.manifest
@@ -70,3 +72,13 @@ secrets.yml
 
 # Articles (personal content)
 articles/
+
+# Internal planning docs
+ROADMAP.md
+RELEASE_NOTES*.md
+PIPELINE_SUMMARY.md
+GITHUB_ACTIONS_OPTIMIZATION.md
+*_OPTIMIZATION.md
+
+# MkDocs build output
+site/
