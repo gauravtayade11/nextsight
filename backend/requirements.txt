@@ -23,6 +23,9 @@ websockets==15.0.1
 
 # Security - Pinned versions to fix CVEs
 # urllib3 version controlled by kubernetes package (requires <2.4.0)
+# Note: urllib3 2.3.0 has CVE-2025-66418, CVE-2025-66471, CVE-2025-50181, CVE-2025-50182
+# Cannot upgrade to 2.6.x until kubernetes-client/python adds support (currently pinned to <2.4.0)
+# See: https://github.com/kubernetes-client/python/issues/2458
 certifi>=2024.12.21  # CVE-2024-56326
 jinja2>=3.1.6  # Multiple CVEs fixed
 cryptography>=44.0.1  # Security fixes
