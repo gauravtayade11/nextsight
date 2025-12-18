@@ -13,6 +13,7 @@ from sqlalchemy import select, and_
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
+from app.utils.security import sanitize_log_input
 from app.schemas.auth import UserInfo
 from app.schemas.pipelines import (
     Pipeline,
@@ -446,9 +447,9 @@ async def approve_stage(
     db.add(approval)
     await db.commit()
     await db.refresh(approval)
-    
-    logger.info(f"Stage {stage_id} approved by {current_user.username}")
-    
+
+    logger.info(f"Stage {sanitize_log_input(str(stage_id))} approved by {sanitize_log_input(current_user.username)}")
+
     return approval.to_dict()
 
 
@@ -498,9 +499,9 @@ async def reject_stage(
     db.add(approval)
     await db.commit()
     await db.refresh(approval)
-    
-    logger.info(f"Stage {stage_id} rejected by {current_user.username}")
-    
+
+    logger.info(f"Stage {sanitize_log_input(str(stage_id))} rejected by {sanitize_log_input(current_user.username)}")
+
     return approval.to_dict()
 
 
@@ -1208,7 +1209,7 @@ async def github_webhook_handler(
             commit_message = data.get("head_commit", {}).get("message", "")[:100] if data.get("head_commit") else ""
             pusher = data.get("pusher", {}).get("name", "webhook")
 
-            logger.info(f"Push to {repo_name}/{branch} - commit {commit_sha[:7]}")
+            logger.info(f"Push to {sanitize_log_input(repo_name)}/{sanitize_log_input(branch)} - commit {sanitize_log_input(commit_sha[:7])}")
 
             # Find pipelines that match this repository and branch
             pipelines = await call_service_method(service, 'list_pipelines')
@@ -1281,7 +1282,7 @@ async def github_webhook_handler(
             commit_sha = data.get("pull_request", {}).get("head", {}).get("sha", "")
             author = data.get("pull_request", {}).get("user", {}).get("login", "webhook")
 
-            logger.info(f"PR #{pr_number} {action} on {repo_name}")
+            logger.info(f"PR #{sanitize_log_input(str(pr_number))} {sanitize_log_input(action)} on {sanitize_log_input(repo_name)}")
 
             # Only trigger on specific actions
             if action not in ["opened", "synchronize", "reopened"]:
@@ -1321,7 +1322,7 @@ async def github_webhook_handler(
                     )
                     run_id = run.get("id") if isinstance(run, dict) else run.id
                     triggered_runs.append({"pipeline_id": p_id, "run_id": run_id})
-                    logger.info(f"Triggered pipeline {p_id} run {run_id} for PR #{pr_number}")
+                    logger.info(f"Triggered pipeline {sanitize_log_input(str(p_id))} run {sanitize_log_input(str(run_id))} for PR #{sanitize_log_input(str(pr_number))}")
 
             return {
                 "status": "processed",
@@ -1433,7 +1434,7 @@ async def pipeline_webhook_trigger(
         else:
             source = "generic"
 
-        logger.info(f"Pipeline webhook triggered: {pipeline_id} from {source}")
+        logger.info(f"Pipeline webhook triggered: {sanitize_log_input(str(pipeline_id))} from {sanitize_log_input(source)}")
 
         # TODO: Trigger pipeline execution
 

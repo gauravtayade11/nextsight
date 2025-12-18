@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.cache import cache_service
+from app.utils.security import sanitize_log_input
 from app.services.kubernetes_service import kubernetes_service
 from app.services.security_service import get_security_service
 from app.services.jenkins_service import jenkins_service
@@ -954,10 +955,10 @@ async def analyze_optimization(request: OptimizationAnalysisRequest):
         cache_key = f"ai:optimization:{request.namespace or 'all'}:{request.focus_area or 'general'}"
         cached_data = await cache_service.get(cache_key)
         if cached_data:
-            logger.info(f"Cache hit for optimization analysis (namespace={request.namespace}, focus={request.focus_area})")
+            logger.info(f"Cache hit for optimization analysis (namespace={sanitize_log_input(request.namespace or 'all')}, focus={sanitize_log_input(request.focus_area or 'general')})")
             return OptimizationAnalysisResponse(**cached_data)
 
-        logger.info(f"Generating AI optimization analysis (namespace={request.namespace}, focus={request.focus_area})")
+        logger.info(f"Generating AI optimization analysis (namespace={sanitize_log_input(request.namespace or 'all')}, focus={sanitize_log_input(request.focus_area or 'general')})")
 
         # Fetch optimization data
         dashboard = await optimization_service.get_optimization_dashboard(request.namespace)
@@ -2189,7 +2190,7 @@ async def summarize_logs(request: LogSummaryRequest):
         cache_key = f"ai:log_summary:{request.namespace or 'all'}:{request.time_window_minutes}"
         cached_data = await cache_service.get(cache_key)
         if cached_data:
-            logger.debug(f"Cache hit for log summary: {cache_key}")
+            logger.debug(f"Cache hit for log summary: {sanitize_log_input(cache_key)}")
             return LogSummaryResponse(**cached_data)
 
         # Fetch recent error/warning events

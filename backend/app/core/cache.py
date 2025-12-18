@@ -9,6 +9,7 @@ import redis.asyncio as redis
 from redis.asyncio import Redis
 
 from app.core.config import settings
+from app.utils.security import sanitize_log_input
 
 logger = logging.getLogger(__name__)
 
@@ -116,12 +117,12 @@ class CacheService:
             cache_key = self._make_key(key)
             value = await client.get(cache_key)
             if value:
-                logger.debug("Cache HIT: %s", key)
+                logger.debug("Cache HIT: %s", sanitize_log_input(key))
                 return json.loads(value)
-            logger.debug("Cache MISS: %s", key)
+            logger.debug("Cache MISS: %s", sanitize_log_input(key))
             return None
         except Exception as e:
-            logger.warning("Cache get error for %s: %s", key, str(e))
+            logger.warning("Cache get error for %s: %s", sanitize_log_input(key), str(e))
             return None
 
     async def set(

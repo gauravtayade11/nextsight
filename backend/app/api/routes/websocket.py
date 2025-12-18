@@ -453,10 +453,13 @@ async def websocket_pod_debug(
         if pid == 0:
             # Child process - exec kubectl
             # Security: os.execvp is safe here because:
-            # 1. kubectl_cmd is a list (array), not a string - no shell interpretation
-            # 2. All user inputs are validated against strict patterns
-            # 3. Image is validated against allowlist
-            # 4. No shell metacharacters can be injected
+            # 1. kubectl_cmd[0] is always "kubectl" (hardcoded, not user input)
+            # 2. kubectl_cmd is a list (array), not a string - no shell interpretation
+            # 3. All user inputs (namespace, pod_name, image, containers) are validated against strict RFC 1123 patterns
+            # 4. Image is validated against allowlist (ALLOWED_DEBUG_IMAGES)
+            # 5. No shell metacharacters can be injected
+            # 6. Settings.K8S_CONFIG_PATH is from environment/config, not user input, and validated above
+            assert kubectl_cmd[0] == "kubectl", "First argument must be kubectl"
             os.execvp(kubectl_cmd[0], kubectl_cmd)  # nosec B606 - Safe, validated inputs
         else:
             # Parent process - handle WebSocket communication
