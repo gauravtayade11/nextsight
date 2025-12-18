@@ -7,14 +7,14 @@ Deploy NextSight AI using the official Helm chart.
 ### From Local Chart
 
 ```bash
-helm install nextsight ./charts/nexops \
+helm install nextsight ./charts/nextsight \
   -n nextsight --create-namespace
 ```
 
 ### With Custom Values
 
 ```bash
-helm install nextsight ./charts/nexops \
+helm install nextsight ./charts/nextsight \
   -n nextsight --create-namespace \
   -f values-production.yaml
 ```
@@ -139,7 +139,7 @@ database:
 ### Upgrade
 
 ```bash
-helm upgrade nextsight ./charts/nexops -n nextsight
+helm upgrade nextsight ./charts/nextsight -n nextsight
 ```
 
 ### Rollback

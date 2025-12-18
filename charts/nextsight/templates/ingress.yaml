@@ -2,10 +2,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "nexops.fullname" . }}
+  name: {{ include "nextsight.fullname" . }}
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "nexops.labels" . | nindent 4 }}
+    {{- include "nextsight.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -35,11 +35,11 @@ spec:
             backend:
               service:
                 {{- if eq .service "backend" }}
-                name: {{ include "nexops.fullname" $ }}-backend
+                name: {{ include "nextsight.fullname" $ }}-backend
                 port:
                   number: {{ $.Values.backend.service.port }}
                 {{- else }}
-                name: {{ include "nexops.fullname" $ }}-frontend
+                name: {{ include "nextsight.fullname" $ }}-frontend
                 port:
                   number: {{ $.Values.frontend.service.port }}
                 {{- end }}

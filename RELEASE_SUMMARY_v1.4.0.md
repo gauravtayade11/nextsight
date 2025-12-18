@@ -168,7 +168,7 @@ NextSight AI v1.4.0 is a major release that enhances the platform with AI-powere
 
 3. **Helm Chart**
    ```bash
-   helm install nextsight ./charts/nexops -n nextsight --create-namespace
+   helm install nextsight ./charts/nextsight -n nextsight --create-namespace
    ```
 
 ### API Additions
@@ -217,7 +217,7 @@ kubectl apply -f k8s/
 git pull origin main
 
 # Upgrade release
-helm upgrade nextsight ./charts/nexops -n nextsight
+helm upgrade nextsight ./charts/nextsight -n nextsight
 ```
 
 ### Configuration Updates

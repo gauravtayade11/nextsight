@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "nexops.fullname" . }}-backend
+  name: {{ include "nextsight.fullname" . }}-backend
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "nexops.labels" . | nindent 4 }}
+    {{- include "nextsight.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 spec:
   type: {{ .Values.backend.service.type }}
@@ -14,16 +14,16 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "nexops.selectorLabels" . | nindent 4 }}
+    {{- include "nextsight.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "nexops.fullname" . }}-frontend
+  name: {{ include "nextsight.fullname" . }}-frontend
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "nexops.labels" . | nindent 4 }}
+    {{- include "nextsight.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   type: {{ .Values.frontend.service.type }}
@@ -33,5 +33,5 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "nexops.selectorLabels" . | nindent 4 }}
+    {{- include "nextsight.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: frontend

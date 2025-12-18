@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "nexops.name" -}}
+{{- define "nextsight.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "nexops.fullname" -}}
+{{- define "nextsight.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,16 +24,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "nexops.chart" -}}
+{{- define "nextsight.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "nexops.labels" -}}
-helm.sh/chart: {{ include "nexops.chart" . }}
-{{ include "nexops.selectorLabels" . }}
+{{- define "nextsight.labels" -}}
+helm.sh/chart: {{ include "nextsight.chart" . }}
+{{ include "nextsight.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -43,17 +43,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "nexops.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "nexops.name" . }}
+{{- define "nextsight.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "nextsight.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "nexops.serviceAccountName" -}}
+{{- define "nextsight.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "nexops.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "nextsight.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -62,13 +62,13 @@ Create the name of the service account to use
 {{/*
 Backend image tag
 */}}
-{{- define "nexops.backendTag" -}}
+{{- define "nextsight.backendTag" -}}
 {{- .Values.backend.image.tag | default .Values.global.imageTag | default .Chart.AppVersion }}
 {{- end }}
 
 {{/*
 Frontend image tag
 */}}
-{{- define "nexops.frontendTag" -}}
+{{- define "nextsight.frontendTag" -}}
 {{- .Values.frontend.image.tag | default .Values.global.imageTag | default .Chart.AppVersion }}
 {{- end }}

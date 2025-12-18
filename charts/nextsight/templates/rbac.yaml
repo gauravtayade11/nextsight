@@ -2,24 +2,24 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "nexops.fullname" . }}
+  name: {{ include "nextsight.fullname" . }}
   labels:
-    {{- include "nexops.labels" . | nindent 4 }}
+    {{- include "nextsight.labels" . | nindent 4 }}
 rules:
   {{- toYaml .Values.rbac.clusterRole.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "nexops.fullname" . }}
+  name: {{ include "nextsight.fullname" . }}
   labels:
-    {{- include "nexops.labels" . | nindent 4 }}
+    {{- include "nextsight.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "nexops.fullname" . }}
+  name: {{ include "nextsight.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "nexops.serviceAccountName" . }}
+    name: {{ include "nextsight.serviceAccountName" . }}
     namespace: {{ .Values.namespace }}
 {{- end }}

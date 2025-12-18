@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "nexops.fullname" . }}-frontend
+  name: {{ include "nextsight.fullname" . }}-frontend
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "nexops.labels" . | nindent 4 }}
+    {{- include "nextsight.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   replicas: {{ .Values.frontend.replicaCount }}
   selector:
     matchLabels:
-      {{- include "nexops.selectorLabels" . | nindent 6 }}
+      {{- include "nextsight.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: frontend
   template:
     metadata:
@@ -19,7 +19,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "nexops.selectorLabels" . | nindent 8 }}
+        {{- include "nextsight.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: frontend
     spec:
       securityContext:
@@ -28,7 +28,7 @@ spec:
         - name: frontend
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.frontend.image.repository }}:{{ include "nexops.frontendTag" . }}"
+          image: "{{ .Values.frontend.image.repository }}:{{ include "nextsight.frontendTag" . }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports:
             - name: http

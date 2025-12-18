@@ -48,7 +48,7 @@ jobs:
             ```bash
             # Clone the repository
             git clone https://github.com/${{ github.repository }}.git
-            cd nexops
+            cd nextsight
             git checkout v${{ steps.version.outputs.VERSION }}
 
             # Using Docker Compose
@@ -90,8 +90,8 @@ jobs:
           context: ./backend
           push: false  # Change to true when registry is ready
           tags: |
-            nexops-backend:${{ steps.version.outputs.VERSION }}
-            nexops-backend:latest
+            nextsight-backend:${{ steps.version.outputs.VERSION }}
+            nextsight-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -101,7 +101,7 @@ jobs:
           context: ./frontend
           push: false  # Change to true when registry is ready
           tags: |
-            nexops-frontend:${{ steps.version.outputs.VERSION }}
-            nexops-frontend:latest
+            nextsight-frontend:${{ steps.version.outputs.VERSION }}
+            nextsight-frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

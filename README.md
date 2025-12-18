@@ -424,15 +424,15 @@ Deploy NextSight AI to your Kubernetes cluster using Helm:
 # helm repo add nextsight https://gauravtayade11.github.io/nextsight/charts
 
 # Install from local chart
-helm install nextsight ./charts/nexops -n nextsight --create-namespace
+helm install nextsight ./charts/nextsight -n nextsight --create-namespace
 
 # Install with custom values
-helm install nextsight ./charts/nexops -n nextsight --create-namespace \
+helm install nextsight ./charts/nextsight -n nextsight --create-namespace \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=nextsight.example.com
 
 # Upgrade existing installation
-helm upgrade nextsight ./charts/nexops -n nextsight
+helm upgrade nextsight ./charts/nextsight -n nextsight
 
 # Uninstall
 helm uninstall nextsight -n nextsight
@@ -448,7 +448,7 @@ helm uninstall nextsight -n nextsight
 | `ingress.hosts[0].host` | Ingress hostname | `nextsight.local` |
 | `backend.extraEnv` | Extra env vars (secrets) | `[]` |
 
-See [charts/nexops/values.yaml](charts/nexops/values.yaml) for all options.
+See [charts/nextsight/values.yaml](charts/nextsight/values.yaml) for all options.
 
 ## Security
 

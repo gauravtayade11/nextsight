@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "nexops.fullname" . }}-backend
+  name: {{ include "nextsight.fullname" . }}-backend
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "nexops.labels" . | nindent 4 }}
+    {{- include "nextsight.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 spec:
   replicas: {{ .Values.backend.replicaCount }}
   selector:
     matchLabels:
-      {{- include "nexops.selectorLabels" . | nindent 6 }}
+      {{- include "nextsight.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: backend
   template:
     metadata:
@@ -19,17 +19,17 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "nexops.selectorLabels" . | nindent 8 }}
+        {{- include "nextsight.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: backend
     spec:
-      serviceAccountName: {{ include "nexops.serviceAccountName" . }}
+      serviceAccountName: {{ include "nextsight.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: backend
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.backend.image.repository }}:{{ include "nexops.backendTag" . }}"
+          image: "{{ .Values.backend.image.repository }}:{{ include "nextsight.backendTag" . }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           ports:
             - name: http

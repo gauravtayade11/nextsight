@@ -6,7 +6,7 @@
 - [x] `VERSION` file updated to `1.4.0`
 - [ ] `backend/app/core/config.py` - `APP_VERSION = "1.4.0"`
 - [ ] `frontend/package.json` - `"version": "1.4.0"`
-- [ ] `charts/nexops/Chart.yaml` - `version: 1.4.0` and `appVersion: "1.4.0"`
+- [ ] `charts/nextsight/Chart.yaml` - `version: 1.4.0` and `appVersion: "1.4.0"`
 - [ ] `k8s/deployment.yaml` - Image tags updated to `v1.4.0`
 - [x] `CHANGELOG.md` - Release date and notes finalized
 - [x] `README.md` - Version badge updated to `1.4.0`
@@ -103,7 +103,7 @@
 - [ ] Backend Dockerfile builds (with Trivy)
 - [ ] Frontend Dockerfile builds
 - [ ] K8s manifests in `k8s/` directory valid
-- [ ] Helm chart in `charts/nexops/` installs successfully
+- [ ] Helm chart in `charts/nextsight/` installs successfully
 - [ ] Helm chart values.yaml documented
 
 #### Makefile Commands

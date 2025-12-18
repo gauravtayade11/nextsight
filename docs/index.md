@@ -121,7 +121,7 @@ Get NextSight AI running in under 5 minutes:
     helm repo add nextsight https://gauravtayade11.github.io/nextsight
 
     # Install the chart
-    helm install nextsight ./charts/nexops -n nextsight --create-namespace
+    helm install nextsight ./charts/nextsight -n nextsight --create-namespace
     ```
 
 ---

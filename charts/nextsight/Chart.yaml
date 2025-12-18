@@ -1,5 +1,5 @@
 apiVersion: v2
-name: nexops
+name: nextsight
 description: A Helm chart for NextSight AI - See your DevOps world in one intelligent view
 type: application
 version: 1.4.0
@@ -10,10 +10,10 @@ keywords:
   - devops
   - monitoring
   - security
-home: https://github.com/gauravtayade11/nexops
+home: https://github.com/gauravtayade11/nextsight
 sources:
-  - https://github.com/gauravtayade11/nexops
+  - https://github.com/gauravtayade11/nextsight
 maintainers:
   - name: Gaurav Tayade
     url: https://github.com/gauravtayade11
-icon: https://raw.githubusercontent.com/gauravtayade11/nexops/main/docs/images/logo.png
+icon: https://raw.githubusercontent.com/gauravtayade11/nextsight/main/docs/images/logo.png

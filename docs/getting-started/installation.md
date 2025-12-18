@@ -93,15 +93,15 @@ For production deployments, use the Helm chart:
 
 ```bash
 # Install from local chart
-helm install nextsight ./charts/nexops -n nextsight --create-namespace
+helm install nextsight ./charts/nextsight -n nextsight --create-namespace
 
 # Install with custom values
-helm install nextsight ./charts/nexops -n nextsight --create-namespace \
+helm install nextsight ./charts/nextsight -n nextsight --create-namespace \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=nextsight.example.com
 
 # Upgrade existing installation
-helm upgrade nextsight ./charts/nexops -n nextsight
+helm upgrade nextsight ./charts/nextsight -n nextsight
 
 # Uninstall
 helm uninstall nextsight -n nextsight

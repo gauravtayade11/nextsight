@@ -1,10 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: nexops
-  namespace: nexops
+  name: nextsight
+  namespace: nextsight
   labels:
-    app.kubernetes.io/name: nexops
+    app.kubernetes.io/name: nextsight
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
@@ -12,20 +12,20 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: nexops.local  # Change to your domain
+    - host: nextsight.local  # Change to your domain
       http:
         paths:
           - path: /api
             pathType: Prefix
             backend:
               service:
-                name: nexops-backend
+                name: nextsight-backend
                 port:
                   number: 8000
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: nexops-frontend
+                name: nextsight-frontend
                 port:
                   number: 80
