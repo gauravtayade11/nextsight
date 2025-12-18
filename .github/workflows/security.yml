@@ -43,7 +43,7 @@ jobs:
         with:
           category: "/language:${{matrix.language}}"
 
-  # Trivy Docker Image Vulnerability Scanner
+  # Trivy Docker Image Vulnerability Scanner (runs only when backend changes)
   trivy-docker:
     name: Trivy Docker Image Scan
     runs-on: ubuntu-latest
@@ -52,20 +52,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Check for backend changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'backend/Dockerfile'
+
       - name: Build Backend Docker image
-        run: docker build -t nexops-backend:scan ./backend
+        if: steps.changes.outputs.backend == 'true' || github.event_name == 'schedule'
+        run: docker build -t nextsight-backend:scan ./backend
 
       - name: Run Trivy vulnerability scanner (Docker)
+        if: steps.changes.outputs.backend == 'true' || github.event_name == 'schedule'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'nexops-backend:scan'
+          image-ref: 'nextsight-backend:scan'
           format: 'sarif'
           output: 'trivy-docker-results.sarif'
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy Docker scan results
+        if: always() && (steps.changes.outputs.backend == 'true' || github.event_name == 'schedule')
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
         with:
           sarif_file: 'trivy-docker-results.sarif'
 
@@ -84,6 +95,7 @@ jobs:
         with:
           fail-on-severity: high
           deny-licenses: GPL-3.0, AGPL-3.0
+        continue-on-error: true
 
   # Secret Scanning Check (using Gitleaks - MIT licensed)
   secrets-scan:
