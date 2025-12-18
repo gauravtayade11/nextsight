@@ -9,6 +9,7 @@ from kubernetes.client.rest import ApiException
 
 from app.core.config import settings
 from app.core.cache import cache_service, CacheConfig
+from app.utils.security import validate_shell_command, validate_path_safe
 from app.schemas.kubernetes import (
     AppliedResourceInfo,
     ClusterMetrics,
@@ -779,9 +780,13 @@ class KubernetesService:
 
                 # Extract roles from labels
                 roles = []
+                role_prefix = "node-role.kubernetes.io/"
                 for label in node.metadata.labels or {}:
-                    if label.startswith("node-role.kubernetes.io/"):
-                        roles.append(label.split("/")[-1])
+                    if label.startswith(role_prefix):
+                        # Extract role name after the prefix
+                        role_name = label[len(role_prefix):]
+                        if role_name:  # Only add non-empty roles
+                            roles.append(role_name)
                 if not roles:
                     roles = ["worker"]
 
@@ -2243,45 +2248,37 @@ class KubernetesService:
         start_time = time.time()
 
         # Determine working directory
+        # Validate working directory to prevent path traversal
         if working_directory:
-            cwd = os.path.expanduser(working_directory)
-        else:
-            cwd = os.path.expanduser("~")
-
-        # Security: Block extremely dangerous commands
-        dangerous_patterns = [
-            "rm -rf /",
-            "rm -rf /*",
-            "mkfs",
-            "dd if=",
-            ":(){ :|:& };:",  # fork bomb
-            "chmod -R 777 /",
-            "chown -R",
-            "> /dev/sda",
-            "mv /* ",
-            "wget .* \\| sh",
-            "curl .* \\| sh",
-            "sudo su",
-            "sudo -i",
-            "passwd",
-            "useradd",
-            "userdel",
-            "groupadd",
-            "groupdel",
-        ]
-
-        command_lower = command.lower()
-        for pattern in dangerous_patterns:
-            if pattern in command_lower:
+            try:
+                validate_path_safe(working_directory)
+                cwd = os.path.expanduser(working_directory)
+            except Exception as e:
                 return ShellResponse(
                     success=False,
                     command=command,
                     stdout="",
-                    stderr=f"Command blocked: This command pattern is not allowed for security reasons",
+                    stderr=f"Invalid working directory: {str(e)}",
                     exit_code=1,
                     execution_time=0.0,
-                    working_directory=cwd,
+                    working_directory=working_directory,
                 )
+        else:
+            cwd = os.path.expanduser("~")
+
+        # Security: Validate command against dangerous patterns
+        try:
+            validate_shell_command(command)
+        except Exception as e:
+            return ShellResponse(
+                success=False,
+                command=command,
+                stdout="",
+                stderr=f"Command blocked: {str(e)}",
+                exit_code=1,
+                execution_time=0.0,
+                working_directory=cwd,
+            )
 
         try:
             # Execute the command using shell

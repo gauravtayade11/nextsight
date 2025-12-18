@@ -18,6 +18,7 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 from app.core.cache import cache_service
+from app.utils.security import validate_kubernetes_name, sanitize_log_input
 
 from app.schemas.prometheus import (
     Alert,
@@ -95,15 +96,25 @@ class PrometheusService:
                 raise
 
     def _get_prometheus_url(self, namespace: str, release_name: str) -> str:
-        """Get Prometheus server URL."""
+        """Get Prometheus server URL with validated inputs."""
+        # Validate inputs to prevent SSRF
+        namespace = validate_kubernetes_name(namespace, "namespace")
+        release_name = validate_kubernetes_name(release_name, "release_name")
+        # Only allow cluster-local URLs to prevent SSRF attacks
         return f"http://{release_name}-prometheus.{namespace}.svc.cluster.local:9090"
 
     def _get_alertmanager_url(self, namespace: str, release_name: str) -> str:
-        """Get Alertmanager URL."""
+        """Get Alertmanager URL with validated inputs."""
+        # Validate inputs to prevent SSRF
+        namespace = validate_kubernetes_name(namespace, "namespace")
+        release_name = validate_kubernetes_name(release_name, "release_name")
         return f"http://{release_name}-alertmanager.{namespace}.svc.cluster.local:9093"
 
     def _get_grafana_url(self, namespace: str, release_name: str) -> str:
-        """Get Grafana URL."""
+        """Get Grafana URL with validated inputs."""
+        # Validate inputs to prevent SSRF
+        namespace = validate_kubernetes_name(namespace, "namespace")
+        release_name = validate_kubernetes_name(release_name, "release_name")
         return f"http://{release_name}-grafana.{namespace}.svc.cluster.local:80"
 
     def _generate_password(self, length: int = 16) -> str:
@@ -761,7 +772,7 @@ class PrometheusService:
                     [tg.model_dump() for tg in result],
                     ttl=30
                 )
-                logger.debug(f"Cached Prometheus targets: {cache_key}")
+                logger.debug(f"Cached Prometheus targets: {sanitize_log_input(cache_key)}")
 
                 return result
 
@@ -779,7 +790,7 @@ class PrometheusService:
         cache_key = f"prometheus:alerts:{namespace}:{release_name}"
         cached_data = await cache_service.get(cache_key)
         if cached_data:
-            logger.debug(f"Cache hit for Prometheus alerts: {cache_key}")
+            logger.debug(f"Cache hit for Prometheus alerts: {sanitize_log_input(cache_key)}")
             return [Alert(**a) for a in cached_data]
 
         base_url = await self._get_prometheus_base_url(namespace, release_name)
@@ -816,7 +827,7 @@ class PrometheusService:
                     [a.model_dump() for a in alerts],
                     ttl=15
                 )
-                logger.debug(f"Cached Prometheus alerts: {cache_key}")
+                logger.debug(f"Cached Prometheus alerts: {sanitize_log_input(cache_key)}")
 
                 return alerts
 

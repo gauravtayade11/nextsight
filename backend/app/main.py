@@ -84,7 +84,9 @@ async def lifespan(app: FastAPI):
         from app.services.oauth_service import oauth_service
         providers = oauth_service.get_enabled_providers()
         if providers:
-            logger.info("OAuth providers enabled: %s", [p["name"] for p in providers])
+            # Only log provider names, not the full configuration (which may contain secrets)
+            provider_names = [p.get("name", "unknown") for p in providers if isinstance(p, dict)]
+            logger.info("OAuth providers enabled: %s", provider_names)
         else:
             logger.info("OAuth enabled but no providers configured")
 

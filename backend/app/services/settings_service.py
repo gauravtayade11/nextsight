@@ -21,6 +21,7 @@ from app.schemas.settings import (
     APITokenCreate, UserSettingsUpdate, UserCreate, UserUpdate,
     IntegrationStatusResponse
 )
+from app.utils.security import validate_url_safe
 
 logger = logging.getLogger(__name__)
 
@@ -180,12 +181,16 @@ class SettingsService:
             return False
 
         try:
+            # Validate URL to prevent SSRF attacks
+            # Allow private IPs for internal services (ArgoCD, Jenkins, etc.)
+            validated_endpoint = validate_url_safe(endpoint, allow_private=True)
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 headers = {}
                 if integration.config.get("api_token"):
                     headers["Authorization"] = f"Bearer {integration.config['api_token']}"
 
-                response = await client.get(endpoint, headers=headers)
+                response = await client.get(validated_endpoint, headers=headers)
                 return response.status_code < 500
         except Exception as e:
             logger.warning(f"Integration health check failed for {integration.name}: {e}")

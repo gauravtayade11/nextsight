@@ -8,6 +8,7 @@ import hashlib
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
+from fastapi import HTTPException
 
 from app.core.config import settings
 
@@ -68,6 +69,14 @@ class GitHubService:
         params: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """Make authenticated request to GitHub API"""
+        # Validate endpoint to prevent SSRF
+        if not endpoint.startswith('/'):
+            raise HTTPException(status_code=400, detail="Endpoint must start with /")
+
+        # Prevent absolute URLs in endpoint parameter
+        if any(proto in endpoint.lower() for proto in ['http://', 'https://', '//']):
+            raise HTTPException(status_code=400, detail="Endpoint cannot contain absolute URLs")
+
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 method=method,

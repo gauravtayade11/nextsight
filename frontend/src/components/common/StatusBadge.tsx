@@ -220,7 +220,7 @@ export function StatusBadge({
         <span
           className={`
             ${sizes.dot} rounded-full
-            ${config.bgColor.replace('bg-', 'bg-').replace('-100', '-500')}
+            ${config.bgColor.replace('-100', '-500')}
             ${isAnimatedState ? 'animate-pulse' : ''}
           `}
         />
@@ -301,7 +301,7 @@ export function SeverityBadge({
         <span
           className={`
             ${sizes.dot} rounded-full
-            ${config.bgColor.replace('bg-', 'bg-').replace('-100', '-500')}
+            ${config.bgColor.replace('-100', '-500')}
           `}
         />
       ) : showIcon ? (

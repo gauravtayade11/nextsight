@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
+from fastapi import HTTPException
 
 from app.schemas.argocd import (
     Application,
@@ -113,6 +114,10 @@ class ArgoCDService:
         Returns:
             Tuple of (success, response_data, error_message)
         """
+        # Validate endpoint to prevent SSRF
+        if any(proto in endpoint.lower() for proto in ['http://', 'https://', '//']):
+            raise HTTPException(status_code=400, detail="Endpoint cannot contain absolute URLs")
+
         # If endpoint starts with api/, use it as-is, otherwise prepend /api/v1/
         endpoint = endpoint.lstrip('/')
         if endpoint.startswith('api/'):

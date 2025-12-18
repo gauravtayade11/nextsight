@@ -418,9 +418,18 @@ async def websocket_pod_debug(
 
     try:
         # Build kubectl debug command with validated inputs
+        # All inputs (namespace, pod_name, image, container names) have been validated
+        # against strict RFC 1123 patterns and allowlists above
         kubectl_cmd = ["kubectl"]
         if settings.K8S_CONFIG_PATH:
+            # Note: K8S_CONFIG_PATH comes from environment/settings, not user input
             config_path = os.path.expanduser(settings.K8S_CONFIG_PATH)
+            # Validate path doesn't contain dangerous characters
+            if any(c in config_path for c in ['..', '${', '$ENV', '\x00']):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Invalid kubeconfig path configuration"
+                )
             kubectl_cmd.extend(["--kubeconfig", config_path])
 
         kubectl_cmd.extend([
@@ -443,7 +452,12 @@ async def websocket_pod_debug(
 
         if pid == 0:
             # Child process - exec kubectl
-            os.execvp(kubectl_cmd[0], kubectl_cmd)
+            # Security: os.execvp is safe here because:
+            # 1. kubectl_cmd is a list (array), not a string - no shell interpretation
+            # 2. All user inputs are validated against strict patterns
+            # 3. Image is validated against allowlist
+            # 4. No shell metacharacters can be injected
+            os.execvp(kubectl_cmd[0], kubectl_cmd)  # nosec B606 - Safe, validated inputs
         else:
             # Parent process - handle WebSocket communication
             await websocket.send_json({

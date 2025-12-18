@@ -22,7 +22,7 @@ passlib[bcrypt]==1.7.4
 websockets==15.0.1
 
 # Security - Pinned versions to fix CVEs
-urllib3>=2.6.0  # CVE-2025-66471, CVE-2025-66418, CVE-2025-50181
+# urllib3 version controlled by kubernetes package (requires <2.4.0)
 certifi>=2024.12.21  # CVE-2024-56326
 jinja2>=3.1.6  # Multiple CVEs fixed
 cryptography>=44.0.1  # Security fixes
