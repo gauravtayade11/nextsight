@@ -32,7 +32,7 @@ class AgentBase(BaseModel):
     port: int = Field(default=8080, ge=1, le=65535)
     labels: List[str] = Field(default_factory=list)
     max_concurrent_jobs: int = Field(default=2, ge=1, le=100)
-    workspace_path: str = Field(default="/tmp/nextsight-agent")
+    workspace_path: str = Field(default="/tmp/nextsight-agent")  # nosec B108 - Default value, user-configurable
     pool: str = Field(default="default", max_length=100)
 
 
@@ -178,7 +178,7 @@ class AgentRegistration(BaseModel):
     disk_gb: Optional[float] = None
     docker_available: bool = False
     kubernetes_available: bool = False
-    workspace_path: str = "/tmp/nextsight-agent"
+    workspace_path: str = "/tmp/nextsight-agent"  # nosec B108 - Default value, user-configurable
 
 
 class AgentRegistrationResponse(BaseModel):

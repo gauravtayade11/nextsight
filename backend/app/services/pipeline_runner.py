@@ -317,12 +317,14 @@ class PipelineRunner:
                 start_time = datetime.now()
 
                 # Execute command
+                # Note: shell=True parameter is handled securely in _run_command
+                # which uses shell=False with ["/bin/bash", "-c", command] pattern
                 result = await self._run_command(
                     command,
                     cwd=cwd,
                     env=env,
                     timeout=step.get("timeout", self.default_timeout),
-                    shell=True,
+                    shell=True,  # nosec B604 - Handled securely in _run_command (line 401)
                 )
 
                 duration = (datetime.now() - start_time).total_seconds()

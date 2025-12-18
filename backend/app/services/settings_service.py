@@ -333,12 +333,27 @@ class SettingsService:
         except Exception as e:
             logger.warning(f"Auto-detection failed: {e}")
 
-    async def _test_endpoint(self, url: str, timeout: float = 3.0) -> bool:
-        """Test if an endpoint is reachable."""
+    async def _test_endpoint(self, url: str, timeout: float = 3.0, verify_ssl: bool = True) -> bool:
+        """Test if an endpoint is reachable.
+
+        Args:
+            url: URL to test
+            timeout: Request timeout in seconds
+            verify_ssl: Whether to verify SSL certificates (default: True for security)
+        """
         try:
-            async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+            # SSL verification enabled by default for security
+            # Only disable for internal/development endpoints if explicitly needed
+            async with httpx.AsyncClient(timeout=timeout, verify=verify_ssl) as client:
                 response = await client.get(url)
                 return response.status_code < 500
+        except httpx.ConnectError:
+            # Connection failed - endpoint not reachable
+            return False
+        except httpx.SSLError:
+            # SSL verification failed - could be self-signed cert
+            # Return False to indicate endpoint not properly configured
+            return False
         except Exception:
             return False
 
