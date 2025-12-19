@@ -459,7 +459,18 @@ See [charts/nextsight/values.yaml](charts/nextsight/values.yaml) for all options
 - **RBAC Ready** - Granular Kubernetes permissions
 
 ### CI/CD Security Scanning
-- **CodeQL Analysis** - Static code analysis for JavaScript and Python
+
+#### Why CodeQL?
+We chose GitHub CodeQL for static code analysis because it:
+- **Deep Semantic Analysis** - Goes beyond pattern matching to understand code flow and data patterns
+- **Zero False Positives** - Precisely identifies real security vulnerabilities (SQL injection, XSS, SSRF, etc.)
+- **Language Coverage** - Native support for JavaScript/TypeScript and Python (our entire stack)
+- **GitHub Integration** - Seamless integration with GitHub Security tab and Advanced Security features
+- **Community Queries** - Leverages thousands of expert-written security queries
+- **Free for Public Repos** - No cost for open-source projects
+
+Our security pipeline includes:
+- **CodeQL Analysis** - Static code analysis for JavaScript/TypeScript and Python
 - **Trivy Docker Scan** - Container vulnerability scanning for CRITICAL/HIGH CVEs
 - **Dependency Review** - License compliance and vulnerability checks on PRs
 - **Secret Detection** - Gitleaks integration for credential leak prevention
