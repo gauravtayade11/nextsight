@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
 import usePipelineStore from '../stores/pipelineStore';
 import PipelineAPI from '../services/pipelineAPI';
-import PipelineOverview from '../components/pipelines/PipelineOverview';
-import PipelineRun from '../components/pipelines/PipelineRun';
-import { useLogStream, useAutoRefresh } from '../hooks/usePipelineHooks';
 
 // Mock API
 vi.mock('../services/pipelineAPI');
@@ -288,7 +283,7 @@ describe('Pipeline Module Integration Tests', () => {
       // First attempt fails
       try {
         await store.fetchPipelines();
-      } catch (e) {
+      } catch (_e) {
         // Expected error
       }
 

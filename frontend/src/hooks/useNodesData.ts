@@ -52,7 +52,7 @@ async function fetchNodesData(): Promise<NodesData> {
     nodePods[nodeName].pods.push(pod);
   });
 
-  let nodePrometheusMetrics: Record<string, NodePrometheusMetrics> = {};
+  const nodePrometheusMetrics: Record<string, NodePrometheusMetrics> = {};
 
   // Fetch per-node metrics from Prometheus if available
   if (prometheusAvailable && nodesRes.data.length > 0) {

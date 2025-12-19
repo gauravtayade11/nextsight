@@ -18,7 +18,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 DEFAULT_ADMIN_PASSWORD=CHANGE_ME_IN_PRODUCTION
 
 # Database (REQUIRED)
-DATABASE_URL=postgresql+asyncpg://nexops_user:password@localhost:5432/nexops
+DATABASE_URL=postgresql+asyncpg://nextsight_user:password@localhost:5432/nextsight
 USE_DATABASE_AUTH=true
 
 # Redis Cache (RECOMMENDED)
@@ -129,7 +129,7 @@ NextSight AI uses PostgreSQL for:
 - Settings and configuration
 
 ```env
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/nexops
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/nextsight
 USE_DATABASE_AUTH=true
 ```
 

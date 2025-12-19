@@ -130,9 +130,9 @@ Get NextSight AI running in under 5 minutes:
 
 <div class="grid" markdown>
 
-![Dashboard](images/dashboard.svg){ loading=lazy }
+![Dashboard - Real-time cluster health with AI insights](images/dashboard-overview.png){ loading=lazy }
 
-![Kubernetes Resources](images/kubernetes.svg){ loading=lazy }
+![Kubernetes - Workload management with health status](images/kubernetes-workloads.png){ loading=lazy }
 
 </div>
 
