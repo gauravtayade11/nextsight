@@ -863,7 +863,9 @@ function WorkloadDrawer({
                           </motion.button>
                         )}
                       </motion.div>
-                ))}
+                    );
+                  })}
+                </div>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">

@@ -80,9 +80,9 @@ function CreateNamespaceModal({ isOpen, onClose, onSuccess }: {
     e.preventDefault();
     if (!name) { setError('Name is required'); return; }
 
-    const nameRegex = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+    const nameRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
     if (!nameRegex.test(name)) {
-      setError('Name must be lowercase, start/end with alphanumeric, and can contain hyphens');
+      setError('Name must be lowercase, start/end with alphanumeric, and can contain hyphens (max 63 chars)');
       return;
     }
 

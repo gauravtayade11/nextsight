@@ -94,7 +94,7 @@ export default function PipelineLogs() {
     }
 
     // Extract timestamp if present
-    const timestampMatch = log.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\]?/);
+    const timestampMatch = log.match(/^\[?(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\]?/);
     const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
 
     return {
