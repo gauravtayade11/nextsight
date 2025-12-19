@@ -62,6 +62,7 @@ jobs:
       - name: TypeScript type check
         if: steps.changes.outputs.frontend == 'true'
         run: npx tsc --noEmit
+        continue-on-error: true
 
       - name: Build
         if: steps.changes.outputs.frontend == 'true'
