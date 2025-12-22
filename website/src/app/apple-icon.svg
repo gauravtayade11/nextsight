@@ -1,0 +1,8 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Kubernetes-inspired hexagon -->
+  <path d="M90 20L152 61V143L90 184L28 143V61L90 20Z" fill="#4F46E5" stroke="#6366F1" stroke-width="4"/>
+
+  <!-- AI sparkle/star in center -->
+  <circle cx="90" cy="102" r="22" fill="#FCD34D"/>
+  <path d="M90 60L90 144M48 102L132 102M62 68L118 136M118 68L62 136" stroke="#FCD34D" stroke-width="6" stroke-linecap="round"/>
+</svg>
